@@ -1,20 +1,44 @@
 import { canvas, paperWrap, ctx, state, screenToWorld, worldToScreen, pretty, pointDistance, render, registerRender } from './core.js';
 
+function minorGridStep() {
+  const candidates = [0.05, 0.1, 0.125, 0.2, 0.25, 0.5, 1, 2, 5, 10];
+  for (const s of candidates) if (s * state.scale >= 9) return s;
+  return candidates[candidates.length - 1];
+}
+function isMultiple(v, m) { return Math.abs(v / m - Math.round(v / m)) < 1e-6; }
+function gridFraction(s) { return ({ 0.05: '1/20', 0.1: '⅒', 0.125: '⅛', 0.2: '⅕', 0.25: '¼', 0.5: '½' }[s] || String(Math.round(s))); }
 function renderGrid() {
   const { width, height } = state.canvasSize;
   ctx.save();
   ctx.fillStyle = '#fffefa'; ctx.fillRect(0, 0, width, height);
   if (state.showGrid && state.paper !== 'blank') {
     const min = screenToWorld({ x: 0, y: height }); const max = screenToWorld({ x: width, y: 0 });
-    const fromX = Math.floor(min.x) - 1, toX = Math.ceil(max.x) + 1, fromY = Math.floor(min.y) - 1, toY = Math.ceil(max.y) + 1;
+    const minor = minorGridStep();
+    const fromX = Math.floor(min.x / minor) - 1, toX = Math.ceil(max.x / minor) + 1, fromY = Math.floor(min.y / minor) - 1, toY = Math.ceil(max.y / minor) + 1;
     if (state.paper === 'dot') {
       ctx.fillStyle = '#d9e0df';
-      for (let x = fromX; x <= toX; x++) for (let y = fromY; y <= toY; y++) { const p = worldToScreen({ x, y }); ctx.beginPath(); ctx.arc(p.x, p.y, 1, 0, Math.PI * 2); ctx.fill(); }
+      for (let ix = fromX; ix <= toX; ix++) for (let iy = fromY; iy <= toY; iy++) { const p = worldToScreen({ x: ix * minor, y: iy * minor }); ctx.beginPath(); ctx.arc(p.x, p.y, 1, 0, Math.PI * 2); ctx.fill(); }
     } else {
-      for (let x = fromX; x <= toX; x++) { const p = worldToScreen({ x, y: 0 }); ctx.beginPath(); ctx.strokeStyle = x % 5 === 0 ? '#d3dcdb' : '#e8eded'; ctx.lineWidth = x % 5 === 0 ? 1 : .65; ctx.moveTo(p.x, 0); ctx.lineTo(p.x, height); ctx.stroke(); }
-      for (let y = fromY; y <= toY; y++) { const p = worldToScreen({ x: 0, y }); ctx.beginPath(); ctx.strokeStyle = y % 5 === 0 ? '#d3dcdb' : '#e8eded'; ctx.lineWidth = y % 5 === 0 ? 1 : .65; ctx.moveTo(0, p.y); ctx.lineTo(width, p.y); ctx.stroke(); }
+      for (let ix = fromX; ix <= toX; ix++) {
+        const x = ix * minor, p = worldToScreen({ x, y: 0 });
+        ctx.beginPath();
+        if (isMultiple(x, 5)) { ctx.strokeStyle = '#d3dcdb'; ctx.lineWidth = 1; }
+        else if (isMultiple(x, 1)) { ctx.strokeStyle = '#dbe4e3'; ctx.lineWidth = .8; }
+        else { ctx.strokeStyle = '#e8eded'; ctx.lineWidth = .65; }
+        ctx.moveTo(p.x, 0); ctx.lineTo(p.x, height); ctx.stroke();
+      }
+      for (let iy = fromY; iy <= toY; iy++) {
+        const y = iy * minor, p = worldToScreen({ x: 0, y });
+        ctx.beginPath();
+        if (isMultiple(y, 5)) { ctx.strokeStyle = '#d3dcdb'; ctx.lineWidth = 1; }
+        else if (isMultiple(y, 1)) { ctx.strokeStyle = '#dbe4e3'; ctx.lineWidth = .8; }
+        else { ctx.strokeStyle = '#e8eded'; ctx.lineWidth = .65; }
+        ctx.moveTo(0, p.y); ctx.lineTo(width, p.y); ctx.stroke();
+      }
     }
   }
+  const note = document.querySelector('.canvas-corner-note');
+  if (note) note.innerHTML = state.paper === 'blank' || !state.showGrid ? '' : `GRAPH PAPER&nbsp; · &nbsp;SQUARES = ${gridFraction(minorGridStep())} UNIT`;
   ctx.strokeStyle = '#536b73'; ctx.lineWidth = 1.35; ctx.beginPath(); ctx.moveTo(0, state.origin.y); ctx.lineTo(width, state.origin.y); ctx.moveTo(state.origin.x, 0); ctx.lineTo(state.origin.x, height); ctx.stroke();
   const axisArrow = (x, y, angle) => { ctx.save(); ctx.translate(x, y); ctx.rotate(angle); ctx.fillStyle = '#536b73'; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(-6, 3); ctx.lineTo(-6, -3); ctx.closePath(); ctx.fill(); ctx.restore(); };
   axisArrow(width - 4, state.origin.y, 0); axisArrow(state.origin.x, 4, -Math.PI / 2);
