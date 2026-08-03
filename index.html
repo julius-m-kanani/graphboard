@@ -275,6 +275,30 @@
         <button class="dock-help" id="equation-help" title="Expression help">?</button>
       </section>
     </main>
+    <div class="modal-backdrop" id="modal-backdrop" hidden>
+      <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+        <button class="modal-close" id="modal-close" aria-label="Close" title="Close">✕</button>
+        <h2 id="modal-title"></h2>
+        <form id="modal-form">
+          <div class="modal-fields">
+            <label id="modal-field-class-name">Class name<input id="modal-class-name" type="text" placeholder="e.g. Math 7A" autocomplete="off" /></label>
+            <label id="modal-field-title">Exercise title<input id="modal-title-input" type="text" placeholder="e.g. Draw a perpendicular" autocomplete="off" /></label>
+            <label id="modal-field-prompt">Instructions for students
+              <textarea id="modal-prompt" rows="3" placeholder="Shown at the top of the workspace while they work."></textarea>
+            </label>
+            <label id="modal-field-steps">Auto-check steps (comma-separated)
+              <input id="modal-steps" type="text" placeholder="e.g. line, compass" autocomplete="off" />
+              <span class="modal-hint">Available: line, ruler, set-square, point, circle, compass, angle, protractor, pencil, plot. Leave blank for no auto-check.</span>
+            </label>
+          </div>
+          <p class="auth-error" id="modal-error"></p>
+          <div class="modal-actions">
+            <button type="button" class="wide-button slim" id="modal-cancel">Cancel</button>
+            <button class="auth-submit slim" type="submit" id="modal-submit">Create</button>
+          </div>
+        </form>
+      </div>
+    </div>
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
     <script type="module" src="js/main.js"></script>
   </body>

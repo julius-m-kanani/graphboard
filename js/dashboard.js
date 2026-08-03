@@ -152,16 +152,6 @@ function openForReview(submission, exercise) {
   updateHistory();
 }
 
-async function createClass() {
-  const name = window.prompt('Class name');
-  if (!name) return;
-  const joinCode = generateJoinCode();
-  const { error } = await supabase.from('classes').insert({ name: name.trim(), join_code: joinCode, teacher_id: currentProfile.id });
-  if (error) { showToast(error.message); return; }
-  showToast('Class created. Join code: ' + joinCode);
-  await renderTeacherDashboard();
-}
-
 function generateJoinCode() {
   const letters = 'ABCDEFGHJKMNPQRSTUVWXYZ';
   const digits = '23456789';
@@ -169,19 +159,68 @@ function generateJoinCode() {
   return part(2, letters) + '-' + part(3, digits);
 }
 
-async function createExercise() {
+function createClass() {
+  openModal('class');
+}
+
+function createExercise() {
   const selectedClass = $('#teacher-classes').dataset.selected;
   if (!selectedClass) { showToast('Select a class first.'); return; }
-  const title = window.prompt('Exercise title');
-  if (!title) return;
-  const prompt = window.prompt('Instructions for students (shown at the top of the workspace)') || '';
-  const stepsRaw = window.prompt('Auto-check steps (comma-separated). Leave blank for no auto-check.\nAvailable: line, ruler, set-square, point, circle, compass, angle, plot') || '';
-  const steps = parseSteps(stepsRaw);
-  if (stepsRaw && !steps.length) { showToast('No valid step types — exercise created without auto-check.'); }
-  const { error } = await supabase.from('exercises').insert({ class_id: selectedClass, title: title.trim(), prompt: prompt.trim(), steps });
-  if (error) { showToast(error.message); return; }
-  showToast(steps.length ? 'Exercise created with auto-check.' : 'Exercise created.');
-  await renderTeacherDashboard();
+  openModal('exercise');
+}
+
+// ---------- Modal ----------
+
+let modalMode = null;
+
+function openModal(mode) {
+  modalMode = mode;
+  const isClass = mode === 'class';
+  $('#modal-title').textContent = isClass ? 'New class' : 'New exercise';
+  $('#modal-submit').textContent = isClass ? 'Create class' : 'Create exercise';
+  $('#modal-field-class-name').hidden = !isClass;
+  $('#modal-field-title').hidden = isClass;
+  $('#modal-field-prompt').hidden = isClass;
+  $('#modal-field-steps').hidden = isClass;
+  $('#modal-class-name').value = '';
+  $('#modal-title-input').value = '';
+  $('#modal-prompt').value = '';
+  $('#modal-steps').value = '';
+  $('#modal-error').textContent = '';
+  $('#modal-backdrop').hidden = false;
+  const first = isClass ? $('#modal-class-name') : $('#modal-title-input');
+  setTimeout(() => first.focus(), 30);
+}
+
+function closeModal() {
+  $('#modal-backdrop').hidden = true;
+  modalMode = null;
+}
+
+async function submitModal() {
+  $('#modal-error').textContent = '';
+  if (modalMode === 'class') {
+    const name = $('#modal-class-name').value.trim();
+    if (!name) { $('#modal-error').textContent = 'Enter a class name.'; return; }
+    const joinCode = generateJoinCode();
+    const { error } = await supabase.from('classes').insert({ name, join_code: joinCode, teacher_id: currentProfile.id });
+    if (error) { $('#modal-error').textContent = error.message; return; }
+    closeModal();
+    showToast('Class created. Join code: ' + joinCode);
+    await renderTeacherDashboard();
+  } else {
+    const selectedClass = $('#teacher-classes').dataset.selected;
+    const title = $('#modal-title-input').value.trim();
+    if (!title) { $('#modal-error').textContent = 'Enter an exercise title.'; return; }
+    const prompt = $('#modal-prompt').value.trim();
+    const stepsRaw = $('#modal-steps').value.trim();
+    const steps = parseSteps(stepsRaw);
+    const { error } = await supabase.from('exercises').insert({ class_id: selectedClass, title, prompt, steps });
+    if (error) { $('#modal-error').textContent = error.message; return; }
+    closeModal();
+    showToast(steps.length ? 'Exercise created with auto-check.' : 'Exercise created.');
+    await renderTeacherDashboard();
+  }
 }
 
 // ---------- Admin ----------
@@ -378,6 +417,11 @@ export function bindDashboardActions(onAuthSuccess) {
   });
   $('#new-class-button').addEventListener('click', createClass);
   $('#new-exercise-button').addEventListener('click', createExercise);
+  $('#modal-form').addEventListener('submit', e => { e.preventDefault(); submitModal(); });
+  $('#modal-cancel').addEventListener('click', closeModal);
+  $('#modal-close').addEventListener('click', closeModal);
+  $('#modal-backdrop').addEventListener('click', e => { if (e.target === e.currentTarget) closeModal(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#modal-backdrop').hidden) closeModal(); });
   $('#rotate-code-button').addEventListener('click', async () => {
     const code = await rotateTeacherAccessCode();
     $('#teacher-access-code').textContent = code || '——';
