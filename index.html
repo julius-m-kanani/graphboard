@@ -51,16 +51,83 @@
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
-    <main class="app-shell">
-      <header class="topbar">
+    <section id="auth-view" class="screen" aria-label="Sign in">
+      <div class="auth-card">
+        <a class="brand auth-brand" href="#" aria-label="Graphboard home">
+          <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
+          <span>graph<span>board</span></span>
+        </a>
+        <h1 class="auth-title">Classroom graph paper</h1>
+        <p class="auth-sub">Sign in to take part in your class exercises, or register for a new account.</p>
+        <div class="segmented auth-tabs" role="tablist" aria-label="Sign in or register">
+          <button class="active" data-authtab="login" role="tab">Sign in</button>
+          <button data-authtab="signup" role="tab">Register</button>
+        </div>
+        <form id="login-form" class="auth-form" autocomplete="on">
+          <label>Email<input id="login-email" type="email" required autocomplete="email" /></label>
+          <label>Password<input id="login-password" type="password" required autocomplete="current-password" /></label>
+          <button class="auth-submit" type="submit">Sign in</button>
+          <p class="auth-error" id="login-error" aria-live="polite"></p>
+        </form>
+        <form id="signup-form" class="auth-form" hidden autocomplete="on">
+          <label>Full name<input id="signup-name" type="text" required autocomplete="name" /></label>
+          <label>Email<input id="signup-email" type="email" required autocomplete="email" /></label>
+          <label>Password<input id="signup-password" type="password" minlength="6" required autocomplete="new-password" /></label>
+          <div class="auth-role" role="group" aria-label="Account type">
+            <label class="role-option"><input type="radio" name="role" value="student" checked /><span>I'm a student</span></label>
+            <label class="role-option"><input type="radio" name="role" value="teacher" /><span>I'm a teacher</span></label>
+          </div>
+          <label id="signup-code-field">Class join code<input id="signup-code" placeholder="e.g. ALPHA-123" /></label>
+          <label id="signup-teacher-field" hidden>Teacher access code<input id="signup-teacher-code" placeholder="supplied by the school" /></label>
+          <button class="auth-submit" type="submit">Create account</button>
+          <p class="auth-error" id="signup-error" aria-live="polite"></p>
+        </form>
+      </div>
+    </section>
+
+    <section id="dashboard-view" class="screen" hidden aria-label="Dashboard">
+      <header class="dash-topbar">
         <a class="brand" href="#" aria-label="Graphboard home">
           <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
           <span>graph<span>board</span></span>
         </a>
+        <div class="dash-user"><span id="dash-user-name"></span><button class="text-button" id="logout-button">Sign out</button></div>
+      </header>
+      <main class="dash-body">
+        <div id="dash-teacher" hidden>
+          <div class="dash-heading"><h1>My classes</h1><button class="wide-button slim" id="new-class-button">+ New class</button></div>
+          <div id="teacher-classes" class="dash-cards"></div>
+          <div class="teacher-code-card">
+            <span>Teacher access code</span>
+            <b id="teacher-access-code">——</b>
+            <button class="wide-button slim" id="rotate-code-button">Rotate</button>
+          </div>
+          <div class="dash-heading" id="exercise-heading" hidden><h1>Exercises</h1><button class="wide-button slim" id="new-exercise-button">+ New exercise</button></div>
+          <div id="teacher-exercises" class="dash-cards"></div>
+          <div class="dash-heading" id="submission-heading" hidden><h1>Submissions</h1></div>
+          <div id="teacher-submissions" class="dash-cards"></div>
+        </div>
+        <div id="dash-student" hidden>
+          <div class="dash-heading"><h1>My exercises</h1></div>
+          <div id="student-exercises" class="dash-cards"></div>
+        </div>
+      </main>
+    </section>
+
+    <main class="app-shell screen" id="workspace-view">
+      <header class="topbar">
+        <div class="workspace-meta">
+          <a class="brand" href="#" aria-label="Graphboard home">
+            <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
+            <span>graph<span>board</span></span>
+          </a>
+          <div id="exercise-badge" class="exercise-badge" hidden><b id="exercise-title"></b><span id="exercise-class"></span></div>
+        </div>
         <div class="document-name"><span class="dot"></span><input aria-label="Worksheet title" value="Cartesian plane" /></div>
         <div class="top-actions">
           <button class="icon-button" id="grid-toggle" aria-label="Toggle grid" title="Show or hide grid">▦</button>
           <button class="text-button" id="export-button">Export <span>⌄</span></button>
+          <button class="text-button" id="back-button" hidden>← Dashboard</button>
         </div>
       </header>
 
@@ -144,6 +211,12 @@
             <span>Drag to draw. Hold <kbd>Space</kbd> to move the paper.</span>
             <span id="object-count">Blank page</span>
           </div>
+          <div class="submission-bar" id="submission-bar" hidden>
+            <span class="submission-prompt" id="submission-prompt"></span>
+            <button class="wide-button slim" id="save-work-button">Save</button>
+            <button class="auth-submit slim" id="submit-work-button">Submit</button>
+            <span class="submission-status" id="submission-status"></span>
+          </div>
         </section>
 
         <aside class="settings-panel">
@@ -187,8 +260,8 @@
         <div class="expression-field"><span>y =</span><input id="expression-input" autocomplete="off" placeholder="e.g. 2*x + 1" /><button id="plot-button">Plot</button></div>
         <button class="dock-help" id="equation-help" title="Expression help">?</button>
       </section>
-      <div class="toast" id="toast" role="status" aria-live="polite"></div>
     </main>
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
     <script type="module" src="js/main.js"></script>
   </body>
 </html>

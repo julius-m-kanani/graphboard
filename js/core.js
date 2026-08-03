@@ -11,6 +11,24 @@ export const state = {
   dpr: 1, canvasSize: { width: 1, height: 1 }, hovering: false, compassAnchor: null, compassCarryRadius: null, divider: null, construction: null, drag: null
 };
 
+export function loadState(data) {
+  state.actions = data.actions || [];
+  state.redo = [];
+  state.scale = data.scale || 32;
+  state.origin = data.origin || { x: 0, y: 0 };
+  state.snapStep = data.snapStep === undefined ? 0.5 : data.snapStep;
+  state.paper = data.paper || 'square';
+  state.showGrid = data.showGrid !== false;
+  state.showLabels = data.showLabels !== false;
+  state.color = data.color || '#244bb3';
+  state.drawing = null;
+  state.drag = null;
+  state.divider = null;
+  state.compassAnchor = null;
+  state.compassCarryRadius = null;
+  state.construction = null;
+}
+
 export const toolCopy = {
   pencil: ['Pencil', 'Draw naturally on the paper.'], point: ['Point', 'Place a precise coordinate point.'], label: ['Label', 'Click a point to rename it, or click empty space to place a labelled point.'],
   line: ['Straight line', 'Drag from one coordinate to another.'], ruler: ['Ruler', 'A guide appears as you draw a measured line.'],

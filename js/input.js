@@ -27,7 +27,7 @@ function showLabelEditor(world, existing) {
   input.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') finish(); else if (e.key === 'Escape') cancel(); }); input.addEventListener('blur', finish); paperWrap.appendChild(input); input.focus(); input.select();
 }
 function zoomBy(f) { const c = { x: state.canvasSize.width / 2, y: state.canvasSize.height / 2 }, w = screenToWorld(c); state.scale = Math.max(15, Math.min(84, state.scale * f)); state.origin = { x: c.x - w.x * state.scale, y: c.y + w.y * state.scale }; $('#scale-readout').textContent = `1 unit = ${Math.round(state.scale)} px`; render(); }
-function compileExpression(raw) {
+export function compileExpression(raw) {
   let expr = raw.trim().toLowerCase().replace(/^y\s*=\s*/, '').replace(/[×]/g, '*').replace(/[÷]/g, '/').replace(/\^/g, '**'); if (!expr) throw Error('Enter an equation first'); if (/[^0-9a-z+\-*/().,\s]/.test(expr)) throw Error('Use numbers, x, and standard operators only');
   const allowed = new Set(['x', 'sin', 'cos', 'tan', 'asin', 'acos', 'atan', 'abs', 'sqrt', 'log', 'ln', 'exp', 'pi', 'e']); const words = expr.match(/[a-z]+/g) || []; if (words.some(w => !allowed.has(w))) throw Error('Try x, sin, cos, sqrt, or other standard functions');
   expr = expr.replace(/\bln\b/g, 'Math.log').replace(/\b(sin|cos|tan|asin|acos|atan|abs|sqrt|log|exp)\b/g, 'Math.$1').replace(/\bpi\b/g, 'Math.PI').replace(/\be\b/g, 'Math.E').replace(/\bx\b/g, 'x'); return new Function('x', `"use strict"; return (${expr});`);
