@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#f6f2e9" />
+    <title>Graphboard — classroom graph paper</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="topbar">
+        <a class="brand" href="#" aria-label="Graphboard home">
+          <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
+          <span>graph<span>board</span></span>
+        </a>
+        <div class="document-name"><span class="dot"></span><input aria-label="Worksheet title" value="Cartesian plane" /></div>
+        <div class="top-actions">
+          <button class="icon-button" id="grid-toggle" aria-label="Toggle grid" title="Show or hide grid">▦</button>
+          <button class="text-button" id="export-button">Export <span>⌄</span></button>
+        </div>
+      </header>
+
+      <section class="studio" aria-label="Graph drawing studio">
+        <aside class="tools-panel">
+          <div class="tool-group">
+            <p class="panel-label">DRAW</p>
+            <button class="tool active" data-tool="pencil" title="Pencil — draw freely">
+              <span class="tool-icon pencil-icon"></span><span>Pencil</span><kbd>P</kbd>
+            </button>
+            <button class="tool" data-tool="point" title="Point — place a coordinate point">
+              <span class="tool-icon point-icon"></span><span>Point</span><kbd>O</kbd>
+            </button>
+            <button class="tool" data-tool="label" title="Label — click a point to rename it, or place a labelled point">
+              <span class="tool-icon label-icon">A′</span><span>Label</span><kbd>N</kbd>
+            </button>
+            <button class="tool" data-tool="line" title="Straight line — click and drag">
+              <span class="tool-icon line-icon"></span><span>Line</span><kbd>L</kbd>
+            </button>
+          </div>
+          <div class="tool-group geometry-tools">
+            <p class="panel-label">GEOMETRY SET</p>
+            <button class="tool" data-tool="ruler" title="Ruler — draw a measured straight line">
+              <span class="tool-icon ruler-icon"></span><span>15 cm ruler</span><kbd>R</kbd>
+            </button>
+            <button class="tool" data-tool="compass" title="Compass — plant the needle, then sweep the pencil leg">
+              <span class="tool-icon compass-icon"></span><span>Compass</span><kbd>C</kbd>
+            </button>
+            <button class="tool" data-tool="dividers" title="Dividers — pick up and transfer a distance">
+              <span class="tool-icon divider-icon"></span><span>Dividers</span><kbd>D</kbd>
+            </button>
+            <button class="tool" data-tool="set45" title="45° set square — draw along a 45° or 90° edge">
+              <span class="tool-icon set45-icon"></span><span>45° set square</span><kbd>Q</kbd>
+            </button>
+            <button class="tool" data-tool="set60" title="30°/60° set square — draw along a 30°, 60° or 90° edge">
+              <span class="tool-icon set60-icon"></span><span>30°/60° square</span><kbd>W</kbd>
+            </button>
+            <button class="tool" data-tool="protractor" title="Protractor — measure and draw an angle">
+              <span class="tool-icon protractor-icon"></span><span>Protractor</span><kbd>A</kbd>
+            </button>
+          </div>
+          <div class="tool-group">
+            <p class="panel-label">EDIT</p>
+            <button class="tool" data-tool="move" title="Move — click a mark and drag it to a new position">
+              <span class="tool-icon move-icon"></span><span>Move</span><kbd>M</kbd>
+            </button>
+            <button class="tool" data-tool="hand" title="Hand — move the paper">
+              <span class="tool-icon hand-icon">✋</span><span>Move paper</span><kbd>H</kbd>
+            </button>
+            <button class="tool" data-tool="eraser" title="Eraser — remove a nearby mark">
+              <span class="tool-icon eraser-icon"></span><span>Rubber / eraser</span><kbd>E</kbd>
+            </button>
+          </div>
+          <div class="tool-group tool-colors">
+            <p class="panel-label">INK</p>
+            <div class="color-row" role="group" aria-label="Ink colour">
+              <button class="swatch active" data-color="#244bb3" style="--swatch:#244bb3" aria-label="Blue ink"></button>
+              <button class="swatch" data-color="#d75448" style="--swatch:#d75448" aria-label="Red ink"></button>
+              <button class="swatch" data-color="#24353d" style="--swatch:#24353d" aria-label="Charcoal ink"></button>
+              <button class="swatch" data-color="#33866b" style="--swatch:#33866b" aria-label="Green ink"></button>
+            </div>
+          </div>
+        </aside>
+
+        <section class="paper-area">
+          <div class="canvas-toolbar">
+            <div class="scale-control"><span>Scale</span><button id="zoom-out" aria-label="Zoom out">−</button><strong id="scale-readout">1 unit = 32 px</strong><button id="zoom-in" aria-label="Zoom in">+</button></div>
+            <div class="canvas-actions">
+              <button id="undo-button" title="Undo (Ctrl/⌘ Z)" disabled>↶ Undo</button>
+              <button id="redo-button" title="Redo (Ctrl/⌘ Shift Z)" disabled>↷ Redo</button>
+              <button class="danger-action" id="clear-button">Clear page</button>
+            </div>
+          </div>
+          <div class="paper-wrap" id="paper-wrap">
+            <canvas id="graph-canvas" aria-label="Interactive Cartesian plane"></canvas>
+            <div class="canvas-corner-note">GRAPH PAPER&nbsp; · &nbsp;SQUARES = 1 UNIT</div>
+            <div class="coordinate-readout" id="coordinate-readout">x: 0&nbsp;&nbsp; y: 0</div>
+            <div class="tool-tip-card" id="tool-tip-card"><b>Pencil</b><span>Draw naturally on the paper.</span></div>
+          </div>
+          <div class="paper-footer">
+            <span>Drag to draw. Hold <kbd>Space</kbd> to move the paper.</span>
+            <span id="object-count">Blank page</span>
+          </div>
+        </section>
+
+        <aside class="settings-panel">
+          <div class="settings-heading"><span>Graph settings</span><button class="icon-button small" id="settings-collapse" aria-label="Collapse graph settings">‹</button></div>
+          <div class="setting-block">
+            <label for="x-min">Visible range</label>
+            <div class="range-grid">
+              <div><small>X min</small><input id="x-min" inputmode="decimal" value="-10" /></div>
+              <div><small>X max</small><input id="x-max" inputmode="decimal" value="10" /></div>
+              <div><small>Y min</small><input id="y-min" inputmode="decimal" value="-7" /></div>
+              <div><small>Y max</small><input id="y-max" inputmode="decimal" value="7" /></div>
+            </div>
+            <button class="wide-button" id="apply-range">Apply range</button>
+          </div>
+          <div class="setting-block">
+            <span>Snap to</span>
+            <div class="segmented" role="group" aria-label="Snap size"><button data-snap="1">1 unit</button><button class="active" data-snap="0.5">½ unit</button><button data-snap="0">Free</button></div>
+          </div>
+          <div class="setting-block switch-line"><span>Show axis labels</span><label class="switch"><input id="labels-toggle" type="checkbox" checked /><span></span></label></div>
+          <div class="setting-block">
+            <label>Paper style</label>
+            <div class="segmented" role="group" aria-label="Paper style"><button class="active" data-paper="square">Square</button><button data-paper="dot">Dot</button><button data-paper="blank">Blank</button></div>
+          </div>
+          <div class="setting-block classroom-note">
+            <span class="note-pin">✦</span><p><b>Teacher tip</b> With the compass, plant the needle first. Sweep the pencil leg steadily so learners can follow the construction.</p>
+          </div>
+          <div class="construction-card" id="construction-card">
+            <p class="panel-label">INTERACTIVE CONSTRUCTION</p>
+            <h2>Construct a perpendicular</h2>
+            <p id="guide-status">Let learners construct a perpendicular to any straight line using only the compass and ruler.</p>
+            <div class="construction-keys" id="construction-keys" aria-hidden="true"></div>
+            <div class="construction-steps" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+            <div class="construction-actions"><button class="construction-button" id="perpendicular-button">On x = 0</button><button class="construction-button" id="any-perpendicular-button">On any line</button></div>
+          </div>
+        </aside>
+      </section>
+
+      <section class="expression-dock" aria-label="Equation plotter">
+        <div class="expression-icon">ƒ</div>
+        <label for="expression-input">Plot an equation</label>
+        <div class="expression-field"><span>y =</span><input id="expression-input" autocomplete="off" placeholder="e.g. 2*x + 1" /><button id="plot-button">Plot</button></div>
+        <button class="dock-help" id="equation-help" title="Expression help">?</button>
+      </section>
+      <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    </main>
+    <script type="module" src="js/main.js"></script>
+  </body>
+</html>
