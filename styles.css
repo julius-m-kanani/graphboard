@@ -78,7 +78,7 @@ button { color:inherit; cursor:pointer; }
 .modal-close{position:absolute;top:14px;right:14px;width:28px;height:28px;border:0;border-radius:50%;background:#f1f4fb;color:#6f85b3;font-size:13px;cursor:pointer}
 .modal-close:hover{background:#e5ecfb}
 .modal-fields label{display:block;margin-bottom:14px;font-size:11px;font-weight:700;color:#66757a}
-.modal-fields input[type=text],.modal-fields textarea{width:100%;margin-top:5px;padding:8px 10px;border:1px solid #dde0d8;border-radius:5px;background:#fffefa;color:#516269;font:12px "DM Mono",monospace;outline:none;box-sizing:border-box}
+.modal-fields input[type=text],.modal-fields textarea,.modal-fields select{width:100%;margin-top:5px;padding:8px 10px;border:1px solid #dde0d8;border-radius:5px;background:#fffefa;color:#516269;font:12px "DM Mono",monospace;outline:none;box-sizing:border-box}
 .modal-fields textarea{resize:vertical}
 .modal-fields input:focus,.modal-fields textarea:focus{border-color:#8da3d7}
 .modal-hint{display:block;margin-top:5px;color:#8a9496;font-size:10px;font-weight:400;line-height:1.4}

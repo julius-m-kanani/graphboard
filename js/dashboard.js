@@ -164,8 +164,6 @@ function createClass() {
 }
 
 function createExercise() {
-  const selectedClass = $('#teacher-classes').dataset.selected;
-  if (!selectedClass) { showToast('Select a class first.'); return; }
   openModal('exercise');
 }
 
@@ -173,12 +171,13 @@ function createExercise() {
 
 let modalMode = null;
 
-function openModal(mode) {
+async function openModal(mode) {
   modalMode = mode;
   const isClass = mode === 'class';
   $('#modal-title').textContent = isClass ? 'New class' : 'New exercise';
   $('#modal-submit').textContent = isClass ? 'Create class' : 'Create exercise';
   $('#modal-field-class-name').hidden = !isClass;
+  $('#modal-field-class-pick').hidden = isClass;
   $('#modal-field-title').hidden = isClass;
   $('#modal-field-prompt').hidden = isClass;
   $('#modal-field-steps').hidden = isClass;
@@ -187,9 +186,25 @@ function openModal(mode) {
   $('#modal-prompt').value = '';
   $('#modal-steps').value = '';
   $('#modal-error').textContent = '';
+  if (!isClass) await populateClassPick();
   $('#modal-backdrop').hidden = false;
   const first = isClass ? $('#modal-class-name') : $('#modal-title-input');
   setTimeout(() => first.focus(), 30);
+}
+
+async function populateClassPick() {
+  const { data: classes, error } = await supabase.from('classes').select('id, name').order('created_at');
+  const pick = $('#modal-class-pick');
+  pick.innerHTML = '';
+  (classes || []).forEach(c => {
+    const opt = document.createElement('option');
+    opt.value = c.id;
+    opt.textContent = c.name;
+    pick.appendChild(opt);
+  });
+  const selected = $('#teacher-classes').dataset.selected;
+  if (selected && (classes || []).some(c => c.id === selected)) pick.value = selected;
+  if (error) showToast('Could not load classes.');
 }
 
 function closeModal() {
@@ -209,15 +224,17 @@ async function submitModal() {
     showToast('Class created. Join code: ' + joinCode);
     await renderTeacherDashboard();
   } else {
-    const selectedClass = $('#teacher-classes').dataset.selected;
+    const classId = $('#modal-class-pick').value;
+    if (!classId) { $('#modal-error').textContent = 'Select a class.'; return; }
     const title = $('#modal-title-input').value.trim();
     if (!title) { $('#modal-error').textContent = 'Enter an exercise title.'; return; }
     const prompt = $('#modal-prompt').value.trim();
     const stepsRaw = $('#modal-steps').value.trim();
     const steps = parseSteps(stepsRaw);
-    const { error } = await supabase.from('exercises').insert({ class_id: selectedClass, title, prompt, steps });
+    const { error } = await supabase.from('exercises').insert({ class_id: classId, title, prompt, steps });
     if (error) { $('#modal-error').textContent = error.message; return; }
     closeModal();
+    $('#teacher-classes').dataset.selected = classId;
     showToast(steps.length ? 'Exercise created with auto-check.' : 'Exercise created.');
     await renderTeacherDashboard();
   }
