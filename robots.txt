@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://julius-m-kanani.github.io/graphboard/sitemap.xml
