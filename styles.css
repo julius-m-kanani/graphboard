@@ -68,3 +68,6 @@ button { color:inherit; cursor:pointer; }
 .teacher-code-card{display:flex;align-items:center;gap:12px;margin:14px 0 4px;padding:12px 14px;background:#fbf7ec;border:1px solid #e9e0c7;border-radius:10px;color:#66757a;font-size:12px}
 .teacher-code-card b{font:700 14px "DM Mono",monospace;color:#355cae;background:#eef2fb;padding:4px 10px;border-radius:6px;letter-spacing:1px}
 .teacher-code-card .wide-button{margin:0 0 0 auto;width:auto}
+.role-select{height:28px;padding:0 6px;border:1px solid #dde0d8;border-radius:5px;background:#fff;color:#516269;font:11px "DM Mono",monospace;cursor:pointer}
+.role-select:disabled{opacity:.5;cursor:default}
+.dash-card-main em{font-style:italic;color:#8a6d2f}

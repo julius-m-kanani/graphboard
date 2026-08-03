@@ -6,7 +6,7 @@ create table if not exists public.profiles (
   id uuid primary key references auth.users (id) on delete cascade,
   email text not null,
   full_name text default '',
-  role text not null default 'student' check (role in ('teacher', 'student')),
+  role text not null default 'student' check (role in ('admin', 'teacher', 'student')),
   created_at timestamptz not null default now()
 );
 
@@ -85,6 +85,53 @@ $$;
 insert into public.settings (key, value)
 select 'teacher_access_code', upper(substr(md5(random()::text), 1, 8))
 where not exists (select 1 from public.settings where key = 'teacher_access_code');
+
+-- Admin role helpers -------------------------------------------------------
+-- is_admin() is used by the RLS policies below, so it is security definer and
+-- reads the profile directly to avoid policy recursion.
+create or replace function public.is_admin()
+returns boolean
+language sql
+security definer set search_path = public
+stable
+as $$
+  select exists (
+    select 1 from public.profiles p
+    where p.id = auth.uid() and p.role = 'admin'
+  );
+$$;
+
+-- Change a user's role. Security definer (bypasses RLS) but guards the caller:
+--  - an existing admin may change anyone's role;
+--  - if no admin exists yet, any signed-in user may promote *themselves* to
+--    admin, which bootstraps the first admin (the teacher access code gates
+--    teacher signup; the admin bootstrap should be disabled once the site has
+--    an admin).
+create or replace function public.admin_set_role(p_user_id uuid, p_role text)
+returns void
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+  v_caller_role text;
+  v_admin_count bigint;
+begin
+  if p_role not in ('admin', 'teacher', 'student') then
+    raise exception 'Invalid role: %', p_role;
+  end if;
+  select role into v_caller_role from public.profiles where id = auth.uid();
+  if v_caller_role <> 'admin' then
+    select count(*) into v_admin_count from public.profiles where role = 'admin';
+    if not (v_admin_count = 0 and p_user_id = auth.uid() and p_role = 'admin') then
+      raise exception 'Only an admin can change roles';
+    end if;
+  end if;
+  update public.profiles set role = p_role where id = p_user_id;
+end;
+$$;
+
+grant execute on function public.admin_set_role(uuid, text) to authenticated;
+grant execute on function public.is_admin() to anon, authenticated;
 
 
 -- Row Level Security ---------------------------------------------------
@@ -184,6 +231,25 @@ create policy "teachers read settings" on public.settings
 -- anon; this mirrors having it baked into the client. Rotation is authenticated-only.
 grant execute on function public.rotate_teacher_code() to authenticated;
 grant execute on function public.get_teacher_access_code() to anon, authenticated;
+
+-- Admins can read and manage everything.
+create policy "admin full access profiles" on public.profiles
+  for all using (public.is_admin()) with check (public.is_admin());
+
+create policy "admin full access classes" on public.classes
+  for all using (public.is_admin()) with check (public.is_admin());
+
+create policy "admin full access class_members" on public.class_members
+  for all using (public.is_admin()) with check (public.is_admin());
+
+create policy "admin full access exercises" on public.exercises
+  for all using (public.is_admin()) with check (public.is_admin());
+
+create policy "admin full access submissions" on public.submissions
+  for all using (public.is_admin()) with check (public.is_admin());
+
+create policy "admin full access settings" on public.settings
+  for all using (public.is_admin()) with check (public.is_admin());
 
 -- Auto-create a profile on signup
 create or replace function public.handle_new_user()

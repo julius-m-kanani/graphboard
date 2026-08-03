@@ -17,10 +17,17 @@ export async function showDashboard(profile) {
   if (profile.role === 'teacher') {
     $('#dash-teacher').hidden = false;
     $('#dash-student').hidden = true;
+    $('#dash-admin').hidden = true;
     await renderTeacherDashboard();
+  } else if (profile.role === 'admin') {
+    $('#dash-admin').hidden = false;
+    $('#dash-teacher').hidden = true;
+    $('#dash-student').hidden = true;
+    await renderAdminDashboard();
   } else {
     $('#dash-student').hidden = false;
     $('#dash-teacher').hidden = true;
+    $('#dash-admin').hidden = true;
     await renderStudentDashboard();
   }
 }
@@ -177,6 +184,91 @@ async function createExercise() {
   await renderTeacherDashboard();
 }
 
+// ---------- Admin ----------
+
+async function renderAdminDashboard() {
+  const [users, classes, exercises, submissions] = await Promise.all([
+    supabase.from('profiles').select('id, email, full_name, role, created_at').order('created_at'),
+    supabase.from('classes').select('id, name, join_code, teacher_id, created_at, profiles!classes_teacher_id_fkey(full_name)').order('created_at'),
+    supabase.from('exercises').select('id, class_id, title, prompt, steps').order('created_at'),
+    supabase.from('submissions').select('*, exercises(title, class_id), profiles(full_name)').order('updated_at', { ascending: false }),
+  ]);
+  if (users.error) { showToast('Could not load users.'); return; }
+  renderAdminUsers(users.data);
+  renderAdminClasses(classes.data, exercises.data);
+  renderAdminSubmissions(submissions.data, exercises.data);
+  fetchTeacherAccessCode().then(code => { if (code) $('#admin-access-code').textContent = code; }).catch(() => {});
+}
+
+function renderAdminUsers(users) {
+  const container = $('#admin-users');
+  container.innerHTML = '';
+  (users || []).forEach(u => {
+    const card = document.createElement('article');
+    card.className = 'dash-card';
+    const isSelf = u.id === currentProfile.id;
+    card.innerHTML = `
+      <div class="dash-card-main">
+        <h3>${escapeHtml(u.full_name || u.email)}${isSelf ? ' <em>(you)</em>' : ''}</h3>
+        <p>${escapeHtml(u.email)} · ${u.role} · ${new Date(u.created_at).toLocaleDateString()}</p>
+      </div>
+      <select class="role-select" data-user-id="${u.id}" ${isSelf ? 'disabled' : ''} title="${isSelf ? 'You cannot change your own role' : 'Change role'}">
+        <option value="student" ${u.role === 'student' ? 'selected' : ''}>student</option>
+        <option value="teacher" ${u.role === 'teacher' ? 'selected' : ''}>teacher</option>
+        <option value="admin" ${u.role === 'admin' ? 'selected' : ''}>admin</option>
+      </select>`;
+    container.appendChild(card);
+  });
+  $$('#admin-users select').forEach(sel => sel.addEventListener('change', async () => {
+    const { error } = await supabase.rpc('admin_set_role', { p_user_id: sel.dataset.userId, p_role: sel.value });
+    if (error) { showToast(error.message); renderAdminUsers(users); }
+    else { showToast('Role updated.'); }
+  }));
+}
+
+function renderAdminClasses(classes, exercises) {
+  const container = $('#admin-classes');
+  container.innerHTML = '';
+  (classes || []).forEach(c => {
+    const teacher = c.profiles?.full_name || 'Unknown teacher';
+    const count = (exercises || []).filter(e => e.class_id === c.id).length;
+    const card = document.createElement('article');
+    card.className = 'dash-card';
+    card.innerHTML = `
+      <div class="dash-card-main">
+        <h3>${escapeHtml(c.name)}</h3>
+        <p>${escapeHtml(teacher)} · ${count} exercise${count === 1 ? '' : 's'}</p>
+      </div>
+      <span class="join-code">${c.join_code}</span>`;
+    container.appendChild(card);
+  });
+  if (!classes?.length) container.innerHTML = '<p class="dash-empty">No classes yet.</p>';
+}
+
+function renderAdminSubmissions(submissions, exercises) {
+  const container = $('#admin-submissions');
+  container.innerHTML = '';
+  (submissions || []).forEach(s => {
+    const exercise = (exercises || []).find(e => e.id === s.exercise_id);
+    const student = s.profiles?.full_name || 'Student';
+    const card = document.createElement('article');
+    card.className = 'dash-card';
+    card.innerHTML = `
+      <div class="dash-card-main">
+        <h3>${escapeHtml(exercise?.title || 'Untitled')} — ${escapeHtml(student)}</h3>
+        <p>${s.status}${s.score != null ? ' · score ' + s.score + '%' : ''}${s.submitted_at ? ' · ' + new Date(s.submitted_at).toLocaleString() : ''}</p>
+      </div>
+      <button class="text-button" data-admin-sub-id="${s.id}">Review</button>`;
+    container.appendChild(card);
+  });
+  if (!submissions?.length) container.innerHTML = '<p class="dash-empty">No submissions yet.</p>';
+  $$('#admin-submissions [data-admin-sub-id]').forEach(btn => btn.addEventListener('click', () => {
+    const s = (submissions || []).find(x => x.id === btn.dataset.adminSubId);
+    const exercise = (exercises || []).find(e => e.id === s?.exercise_id);
+    if (s && exercise) { showToast('Opening student work in the workspace…'); openForReview(s, exercise); }
+  }));
+}
+
 // ---------- Student ----------
 
 async function renderStudentDashboard() {
@@ -289,6 +381,11 @@ export function bindDashboardActions(onAuthSuccess) {
   $('#rotate-code-button').addEventListener('click', async () => {
     const code = await rotateTeacherAccessCode();
     $('#teacher-access-code').textContent = code || '——';
+    showToast('Teacher access code rotated.');
+  });
+  $('#admin-rotate-code-button').addEventListener('click', async () => {
+    const code = await rotateTeacherAccessCode();
+    $('#admin-access-code').textContent = code || '——';
     showToast('Teacher access code rotated.');
   });
   $('#save-work-button').addEventListener('click', () => saveWork(false));
