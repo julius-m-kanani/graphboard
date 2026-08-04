@@ -41,7 +41,7 @@ function renderGrid() {
   if (note) note.innerHTML = state.paper === 'blank' || !state.showGrid ? '' : `GRAPH PAPER&nbsp; · &nbsp;SQUARES = ${gridFraction(minorGridStep())} UNIT`;
   ctx.strokeStyle = '#536b73'; ctx.lineWidth = 1.35; ctx.beginPath(); ctx.moveTo(0, state.origin.y); ctx.lineTo(width, state.origin.y); ctx.moveTo(state.origin.x, 0); ctx.lineTo(state.origin.x, height); ctx.stroke();
   const axisArrow = (x, y, angle) => { ctx.save(); ctx.translate(x, y); ctx.rotate(angle); ctx.fillStyle = '#536b73'; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(-6, 3); ctx.lineTo(-6, -3); ctx.closePath(); ctx.fill(); ctx.restore(); };
-  axisArrow(width - 4, state.origin.y, 0); axisArrow(state.origin.x, 4, -Math.PI / 2);
+  axisArrow(width - 4, state.origin.y, 0); axisArrow(4, state.origin.y, Math.PI); axisArrow(state.origin.x, 4, -Math.PI / 2); axisArrow(state.origin.x, height - 4, Math.PI / 2);
   if (state.showLabels) renderLabels();
   ctx.restore();
 }

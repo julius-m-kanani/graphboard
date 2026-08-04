@@ -665,9 +665,6 @@ export function bindDashboardActions(onAuthSuccess) {
     await supabase.auth.signOut();
     onAuthSuccess(null);
   });
-  $('#classroom-button').addEventListener('click', () => {
-    showWorkspace();
-  });
   $('#new-class-button').addEventListener('click', createClass);
   $('#new-exercise-button').addEventListener('click', createExercise);
   

@@ -53,10 +53,7 @@ async function boot() {
   attachAuthHandlers(route);
 
   try {
-    const profile = await withTimeout(getProfile(), 6000);
-    if (profile) {
-      showDashboard(profile);
-    }
+    await withTimeout(getProfile(), 6000);
   } catch (e) {
     console.error('getProfile failed:', e);
   }
