@@ -1,13 +1,14 @@
-import { $, $$, showToast } from './core.js';
+import { $, showToast } from './core.js';
 import { supabase, getProfile } from './supabase.js';
 
 let authFormsBound = false;
+window.__authFormsBound = false; // for debugging
 
 export async function showAuthView() {
   $('#auth-view').hidden = false;
   $('#dashboard-view').hidden = true;
   $('#workspace-view').hidden = true;
-  if (!authFormsBound) { setupAuthForms(); authFormsBound = true; }
+  if (!authFormsBound) { setupAuthForms(); authFormsBound = true; window.__authFormsBound = true; }
   resetAuthForms();
 }
 
@@ -28,18 +29,28 @@ function resetAuthForms() {
 }
 
 function setupAuthForms() {
-  $$('.auth-tabs button').forEach(tab => tab.addEventListener('click', () => {
-    $$('.auth-tabs button').forEach(t => t.classList.toggle('active', t === tab));
-    const tabName = tab.dataset.authtab;
-    $('#login-form').hidden = tabName !== 'login';
-    $('#signup-form').hidden = tabName !== 'signup';
-    $('#login-error').textContent = '';
-    $('#signup-error').textContent = '';
-  }));
-  const roleInputs = $$('input[name="role"]');
+  // Use event delegation on the tabs container for reliability
+  const tabs = document.querySelector('.auth-tabs');
+  if (tabs) {
+    tabs.addEventListener('click', e => {
+      const tab = e.target.closest('button[data-authtab]');
+      if (!tab) return;
+      document.querySelectorAll('.auth-tabs button').forEach(t => t.classList.toggle('active', t === tab));
+      const tabName = tab.dataset.authtab;
+      const loginForm = document.getElementById('login-form');
+      const signupForm = document.getElementById('signup-form');
+      if (loginForm) loginForm.hidden = tabName !== 'login';
+      if (signupForm) signupForm.hidden = tabName !== 'signup';
+      const loginError = document.getElementById('login-error');
+      const signupError = document.getElementById('signup-error');
+      if (loginError) loginError.textContent = '';
+      if (signupError) signupError.textContent = '';
+    });
+  }
+  const roleInputs = document.querySelectorAll('input[name="role"]');
   roleInputs.forEach(input => input.addEventListener('change', () => {
-    const teacher = $('#signup-teacher-code').closest('label');
-    teacher.hidden = input.value !== 'teacher';
+    const teacher = document.getElementById('signup-teacher-code')?.closest('label');
+    if (teacher) teacher.hidden = input.value !== 'teacher';
   }));
 }
 

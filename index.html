@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#f6f2e9" />
-    <title>Graphboard — free online graph paper &amp; classroom geometry set</title>
+    <title>Graphboard — free online graph paper & classroom geometry set</title>
     <meta name="description" content="Graphboard is a free, no-install online graph paper workspace for school. Draw a Cartesian plane, plot equations, and use a compass, ruler, set square and protractor to build classic Euclidean constructions." />
     <meta name="keywords" content="graph paper, graphing calculator, Cartesian plane, compass and ruler, geometry tools, equation plotter, online graph paper, classroom, Euclidean construction" />
     <meta name="author" content="Julius Kanani" />
@@ -21,14 +21,14 @@
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://julius-m-kanani.github.io/graphboard/" />
     <meta property="og:site_name" content="Graphboard" />
-    <meta property="og:title" content="Graphboard — free online graph paper &amp; classroom geometry set" />
+    <meta property="og:title" content="Graphboard — free online graph paper & classroom geometry set" />
     <meta property="og:description" content="Free, no-install graph paper for school: Cartesian plane, equation plotting, and a real compass, ruler, set square and protractor for Euclidean constructions." />
     <meta property="og:image" content="https://julius-m-kanani.github.io/graphboard/og-image.png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
 
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Graphboard — free online graph paper &amp; classroom geometry set" />
+    <meta name="twitter:title" content="Graphboard — free online graph paper & classroom geometry set" />
     <meta name="twitter:description" content="Free, no-install graph paper for school: Cartesian plane, equation plotting, and a real compass, ruler, set square and protractor." />
     <meta name="twitter:image" content="https://julius-m-kanani.github.io/graphboard/og-image.png" />
 
@@ -51,84 +51,7 @@
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
-    <section id="auth-view" class="screen" aria-label="Sign in">
-      <div class="auth-card">
-        <a class="brand auth-brand" href="#" aria-label="Graphboard home">
-          <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
-          <span>graph<span>board</span></span>
-        </a>
-        <h1 class="auth-title">Classroom graph paper</h1>
-        <p class="auth-sub">Sign in to take part in your class exercises, or register for a new account.</p>
-        <div class="segmented auth-tabs" role="tablist" aria-label="Sign in or register">
-          <button class="active" data-authtab="login" role="tab">Sign in</button>
-          <button data-authtab="signup" role="tab">Register</button>
-        </div>
-        <form id="login-form" class="auth-form" autocomplete="on">
-          <label>Email<input id="login-email" type="email" required autocomplete="email" /></label>
-          <label>Password<input id="login-password" type="password" required autocomplete="current-password" /></label>
-          <button class="auth-submit" type="submit">Sign in</button>
-          <p class="auth-error" id="login-error" aria-live="polite"></p>
-        </form>
-        <form id="signup-form" class="auth-form" hidden autocomplete="on">
-          <label>Full name<input id="signup-name" type="text" required autocomplete="name" /></label>
-          <label>Email<input id="signup-email" type="email" required autocomplete="email" /></label>
-          <label>Password<input id="signup-password" type="password" minlength="6" required autocomplete="new-password" /></label>
-          <div class="auth-role" role="group" aria-label="Account type">
-            <label class="role-option"><input type="radio" name="role" value="student" checked /><span>I'm a student</span></label>
-            <label class="role-option"><input type="radio" name="role" value="teacher" /><span>I'm a teacher</span></label>
-          </div>
-          <label id="signup-code-field">Class join code<input id="signup-code" placeholder="e.g. ALPHA-123" /></label>
-          <label id="signup-teacher-field" hidden>Teacher access code<input id="signup-teacher-code" placeholder="supplied by the school" /></label>
-          <button class="auth-submit" type="submit">Create account</button>
-          <p class="auth-error" id="signup-error" aria-live="polite"></p>
-        </form>
-      </div>
-    </section>
-
-    <section id="dashboard-view" class="screen" hidden aria-label="Dashboard">
-      <header class="dash-topbar">
-        <a class="brand" href="#" aria-label="Graphboard home">
-          <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
-          <span>graph<span>board</span></span>
-        </a>
-        <div class="dash-user"><span id="dash-user-name"></span><button class="text-button" id="logout-button">Sign out</button></div>
-      </header>
-      <main class="dash-body">
-        <div id="dash-teacher" hidden>
-          <div class="dash-heading"><h1>My classes</h1><button class="wide-button slim" id="new-class-button">+ New class</button></div>
-          <div id="teacher-classes" class="dash-cards"></div>
-          <div class="teacher-code-card">
-            <span>Teacher access code</span>
-            <b id="teacher-access-code">——</b>
-            <button class="wide-button slim" id="rotate-code-button">Rotate</button>
-          </div>
-          <div class="dash-heading" id="exercise-heading" hidden><h1>Exercises</h1><button class="wide-button slim" id="new-exercise-button">+ New exercise</button></div>
-          <div id="teacher-exercises" class="dash-cards"></div>
-          <div class="dash-heading" id="submission-heading" hidden><h1>Submissions</h1></div>
-          <div id="teacher-submissions" class="dash-cards"></div>
-        </div>
-        <div id="dash-student" hidden>
-          <div class="dash-heading"><h1>My exercises</h1></div>
-          <div id="student-exercises" class="dash-cards"></div>
-        </div>
-        <div id="dash-admin" hidden>
-          <div class="dash-heading"><h1>Site administration</h1></div>
-          <div class="teacher-code-card">
-            <span>Teacher access code</span>
-            <b id="admin-access-code">——</b>
-            <button class="wide-button slim" id="admin-rotate-code-button">Rotate</button>
-          </div>
-          <div class="dash-heading"><h1>Users</h1></div>
-          <div id="admin-users" class="dash-cards"></div>
-          <div class="dash-heading"><h1>Classes</h1></div>
-          <div id="admin-classes" class="dash-cards"></div>
-          <div class="dash-heading"><h1>Submissions</h1></div>
-          <div id="admin-submissions" class="dash-cards"></div>
-        </div>
-      </main>
-    </section>
-
-    <main class="app-shell screen" id="workspace-view">
+    <main class="app-shell" id="workspace-view">
       <header class="topbar">
         <div class="workspace-meta">
           <a class="brand" href="#" aria-label="Graphboard home">
@@ -136,12 +59,17 @@
             <span>graph<span>board</span></span>
           </a>
           <div id="exercise-badge" class="exercise-badge" hidden><b id="exercise-title"></b><span id="exercise-class"></span></div>
+          <div id="builder-badge" class="exercise-badge" hidden><b>Exercise Builder</b><span id="builder-status"></span></div>
         </div>
-        <div class="document-name"><span class="dot"></span><input aria-label="Worksheet title" value="Cartesian plane" /></div>
+        <div class="document-name"><span class="dot"></span><input id="doc-title" aria-label="Worksheet title" value="Cartesian plane" /></div>
         <div class="top-actions">
           <button class="icon-button" id="grid-toggle" aria-label="Toggle grid" title="Show or hide grid">▦</button>
           <button class="text-button" id="export-button">Export <span>⌄</span></button>
+          <button class="text-button" id="classroom-button">Classroom</button>
           <button class="text-button" id="back-button" hidden>← Dashboard</button>
+          <button class="icon-button" id="builder-extract" hidden title="Extract steps from drawing" aria-label="Auto-extract steps from your drawing">⚙</button>
+          <button class="text-button" id="builder-preview" hidden>Preview</button>
+          <button class="auth-submit" id="builder-assign" hidden>Assign</button>
         </div>
       </header>
 
@@ -234,7 +162,7 @@
         </section>
 
         <aside class="settings-panel">
-          <div class="settings-heading"><span>Graph settings</span><button class="icon-button small" id="settings-collapse" aria-label="Collapse graph settings">‹</button></div>
+          <div class="settings-heading"><span>Graph settings</span><button class="icon-button" id="settings-collapse" aria-label="Collapse graph settings">‹</button></div>
           <div class="setting-block">
             <label for="x-min">Visible range</label>
             <div class="range-grid">
@@ -275,6 +203,105 @@
         <button class="dock-help" id="equation-help" title="Expression help">?</button>
       </section>
     </main>
+
+    <aside class="builder-panel" id="builder-panel" hidden aria-label="Exercise Builder">
+      <div class="builder-header">
+        <h3>Exercise Builder</h3>
+        <button class="icon-button" id="builder-close" title="Exit builder">✕</button>
+      </div>
+      <div class="builder-section">
+        <h4>Steps</h4>
+        <div id="builder-steps-empty" class="builder-empty">Draw the solution on the graph paper, then click <b>Extract Steps</b>.</div>
+        <ul id="builder-steps-list"></ul>
+        <div class="builder-actions">
+          <button class="wide-button" id="builder-extract-steps">Extract Steps</button>
+          <button class="text-button" id="builder-clear-steps">Clear</button>
+        </div>
+      </div>
+      <div class="builder-section">
+        <h4>Preview & Assign</h4>
+        <button class="wide-button" id="builder-preview-btn">Preview as Student</button>
+        <button class="auth-submit" id="builder-assign-btn">Assign to Class</button>
+      </div>
+    </aside>
+
+    <section id="auth-view" class="screen" hidden aria-label="Sign in">
+      <div class="auth-card">
+        <a class="brand auth-brand" href="#" aria-label="Graphboard home">
+          <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
+          <span>graph<span>board</span></span>
+        </a>
+        <h1 class="auth-title">Classroom graph paper</h1>
+        <p class="auth-sub">Sign in to take part in your class exercises, or register for a new account.</p>
+        <div class="segmented auth-tabs" role="tablist" aria-label="Sign in or register">
+          <button class="active" data-authtab="login" role="tab">Sign in</button>
+          <button data-authtab="signup" role="tab">Register</button>
+        </div>
+        <form id="login-form" class="auth-form" autocomplete="on">
+          <label>Email<input id="login-email" type="email" required autocomplete="email" /></label>
+          <label>Password<input id="login-password" type="password" required autocomplete="current-password" /></label>
+          <button class="auth-submit" type="submit">Sign in</button>
+          <p class="auth-error" id="login-error" aria-live="polite"></p>
+        </form>
+        <form id="signup-form" class="auth-form" hidden autocomplete="on">
+          <label>Full name<input id="signup-name" type="text" required autocomplete="name" /></label>
+          <label>Email<input id="signup-email" type="email" required autocomplete="email" /></label>
+          <label>Password<input id="signup-password" type="password" minlength="6" required autocomplete="new-password" /></label>
+          <div class="auth-role" role="group" aria-label="Account type">
+            <label class="role-option"><input type="radio" name="role" value="student" checked /><span>I'm a student</span></label>
+            <label class="role-option"><input type="radio" name="role" value="teacher" /><span>I'm a teacher</span></label>
+          </div>
+          <label id="signup-code-field">Class join code<input id="signup-code" placeholder="e.g. ALPHA-123" /></label>
+          <label id="signup-teacher-field" hidden>Teacher access code<input id="signup-teacher-code" placeholder="supplied by the school" /></label>
+          <button class="auth-submit" type="submit">Create account</button>
+          <p class="auth-error" id="signup-error" aria-live="polite"></p>
+        </form>
+      </div>
+    </section>
+
+    <section id="dashboard-view" class="screen" hidden aria-label="Dashboard">
+      <header class="dash-topbar">
+        <a class="brand" href="#" aria-label="Graphboard home">
+          <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
+          <span>graph<span>board</span></span>
+        </a>
+        <div class="dash-user"><span id="dash-user-name"></span><button class="text-button" id="logout-button">Sign out</button></div>
+      </header>
+      <main class="dash-body">
+        <div id="dash-teacher" hidden>
+          <div class="dash-heading"><h1>My classes</h1><button class="wide-button slim" id="new-class-button">+ New class</button></div>
+          <div id="teacher-classes" class="dash-cards"></div>
+          <div class="teacher-code-card">
+            <span>Teacher access code</span>
+            <b id="teacher-access-code">——</b>
+            <button class="wide-button slim" id="rotate-code-button">Rotate</button>
+          </div>
+          <div class="dash-heading" id="exercise-heading" hidden><h1>Exercises</h1><button class="wide-button slim" id="new-exercise-button">+ New exercise</button></div>
+          <div id="teacher-exercises" class="dash-cards"></div>
+          <div class="dash-heading" id="submission-heading" hidden><h1>Submissions</h1></div>
+          <div id="teacher-submissions" class="dash-cards"></div>
+        </div>
+        <div id="dash-student" hidden>
+          <div class="dash-heading"><h1>My exercises</h1></div>
+          <div id="student-exercises" class="dash-cards"></div>
+        </div>
+        <div id="dash-admin" hidden>
+          <div class="dash-heading"><h1>Site administration</h1></div>
+          <div class="teacher-code-card">
+            <span>Teacher access code</span>
+            <b id="admin-access-code">——</b>
+            <button class="wide-button slim" id="admin-rotate-code-button">Rotate</button>
+          </div>
+          <div class="dash-heading"><h1>Users</h1></div>
+          <div id="admin-users" class="dash-cards"></div>
+          <div class="dash-heading"><h1>Classes</h1></div>
+          <div id="admin-classes" class="dash-cards"></div>
+          <div class="dash-heading"><h1>Submissions</h1></div>
+          <div id="admin-submissions" class="dash-cards"></div>
+        </div>
+      </main>
+    </section>
+
     <div class="modal-backdrop" id="modal-backdrop" hidden>
       <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modal-title">
         <button class="modal-close" id="modal-close" aria-label="Close" title="Close">✕</button>
@@ -300,6 +327,7 @@
         </form>
       </div>
     </div>
+
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
     <script type="module" src="js/main.js"></script>
   </body>

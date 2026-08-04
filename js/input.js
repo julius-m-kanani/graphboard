@@ -47,7 +47,7 @@ function endDraw(e) {
 }
 
 canvas.addEventListener('pointerdown', e => {
-  e.preventDefault(); canvas.setPointerCapture(e.pointerId); const s = eventPoint(e); state.pointer = s; const rawWorld = screenToWorld(s); const constructionFree = state.construction && (state.tool === 'compass' || (state.tool === 'ruler' && (state.construction.step === 'ruler' || state.construction.step === 'choose-line')) || (state.tool === 'point' && state.construction.step === 'pick-point' && state.construction.mode === 'any')); const w = state.tool === 'pencil' || state.tool === 'eraser' || constructionFree ? rawWorld : snap(rawWorld);
+  e.preventDefault(); try { canvas.setPointerCapture(e.pointerId); } catch (err) {} const s = eventPoint(e); state.pointer = s; const rawWorld = screenToWorld(s); const constructionFree = state.construction && (state.tool === 'compass' || (state.tool === 'ruler' && (state.construction.step === 'ruler' || state.construction.step === 'choose-line')) || (state.tool === 'point' && state.construction.step === 'pick-point' && state.construction.mode === 'any')); const w = state.tool === 'pencil' || state.tool === 'eraser' || constructionFree ? rawWorld : snap(rawWorld);
   if (state.tool === 'eraser') { eraseNear(w); return; }
   if (state.tool === 'move') { const target = pickAction(rawWorld); if (target) { state.drag = { action: target, from: { ...rawWorld } }; canvas.style.cursor = 'grabbing'; render(); } return; }
   if (state.tool === 'label') { showLabelEditor(rawWorld, pickPointNear(rawWorld)); return; }

@@ -1,10 +1,10 @@
-import { $, $$, showToast, loadState } from './core.js';
+import { $, $$, state, showToast, loadState } from './core.js';
 import { supabase } from './supabase.js';
 import { fetchTeacherAccessCode, rotateTeacherAccessCode } from './auth.js';
 import { deserializeState } from './serialize.js';
 import { resizeCanvas } from './draw.js';
 import { updateHistory } from './history.js';
-import { parseSteps, gradeSubmission } from './autocheck.js';
+import { parseSteps, gradeSubmission, STEP_TYPES } from './autocheck.js';
 
 let currentProfile = null;
 
@@ -13,6 +13,8 @@ export async function showDashboard(profile) {
   $('#auth-view').hidden = true;
   $('#dashboard-view').hidden = false;
   $('#workspace-view').hidden = true;
+  $('#classroom-button').hidden = true;
+  $('#back-button').hidden = false;
   $('#dash-user-name').textContent = profile.full_name || 'You';
   if (profile.role === 'teacher') {
     $('#dash-teacher').hidden = false;
@@ -30,6 +32,17 @@ export async function showDashboard(profile) {
     $('#dash-admin').hidden = true;
     await renderStudentDashboard();
   }
+}
+
+function showWorkspace() {
+  currentProfile = null;
+  $('#auth-view').hidden = true;
+  $('#dashboard-view').hidden = true;
+  $('#workspace-view').hidden = false;
+  $('#classroom-button').hidden = false;
+  $('#back-button').hidden = true;
+  resizeCanvas();
+  updateHistory();
 }
 
 // ---------- Teacher ----------
@@ -141,6 +154,8 @@ async function viewExercise(exerciseId) {
 function openForReview(submission, exercise) {
   const saved = typeof submission.actions === 'string' ? JSON.parse(submission.actions || '{}') : (submission.actions || {});
   loadState(deserializeState(saved));
+  window.__activeExercise = exercise;
+  window.__activeSubmission = submission;
   $('#exercise-title').textContent = exercise.title + ' (review)';
   $('#exercise-class').textContent = (submission.profiles?.full_name || 'student') + ' — review only';
   $('#exercise-badge').hidden = false;
@@ -161,10 +176,6 @@ function generateJoinCode() {
 
 function createClass() {
   openModal('class');
-}
-
-function createExercise() {
-  openModal('exercise');
 }
 
 // ---------- Modal ----------
@@ -214,33 +225,255 @@ function closeModal() {
 
 async function submitModal() {
   $('#modal-error').textContent = '';
-  if (modalMode === 'class') {
-    const name = $('#modal-class-name').value.trim();
-    if (!name) { $('#modal-error').textContent = 'Enter a class name.'; return; }
-    const joinCode = generateJoinCode();
-    const { error } = await supabase.from('classes').insert({ name, join_code: joinCode, teacher_id: currentProfile.id });
-    if (error) { $('#modal-error').textContent = error.message; return; }
-    closeModal();
-    showToast('Class created. Join code: ' + joinCode);
-    await renderTeacherDashboard();
+  const name = $('#modal-class-name').value.trim();
+  if (!name) { $('#modal-error').textContent = 'Enter a class name.'; return; }
+  const joinCode = generateJoinCode();
+  const { error } = await supabase.from('classes').insert({ name, join_code: joinCode, teacher_id: currentProfile.id });
+  if (error) { $('#modal-error').textContent = error.message; return; }
+  closeModal();
+  showToast('Class created. Join code: ' + joinCode);
+  await renderTeacherDashboard();
+}
+
+let builderState = {
+  classId: null,
+  mode: 'build', // 'build' | 'preview'
+  extractedSteps: []
+};
+
+function createExercise() {
+  const selectedClass = $('#teacher-classes').dataset.selected;
+  if (!selectedClass) { showToast('Select a class first.'); return; }
+  openExerciseBuilder(selectedClass);
+}
+
+// ---------- Exercise Builder ----------
+
+async function openExerciseBuilder(classId) {
+  builderState.classId = classId;
+  builderState.mode = 'build';
+  builderState.extractedSteps = [];
+  
+  // Switch to workspace in builder mode
+  $('#dashboard-view').hidden = true;
+  $('#workspace-view').hidden = false;
+  $('#exercise-badge').hidden = true;
+  $('#builder-badge').hidden = false;
+  $('#builder-status').textContent = 'Build mode — draw the solution';
+  $('#builder-extract').hidden = false;
+  $('#builder-preview').hidden = false;
+  $('#builder-assign').hidden = false;
+  $('#back-button').hidden = true;
+  $('#submission-bar').hidden = true;
+  $('#builder-panel').hidden = false;
+  
+  // Clear canvas for fresh drawing
+  clearCanvasForBuilder();
+  renderBuilderSteps();
+  
+  // Load class name for badge
+  const { data: cls } = await supabase.from('classes').select('name').eq('id', classId).single();
+  $('#builder-status').textContent = cls?.name || 'Build mode — draw the solution';
+}
+
+function clearCanvasForBuilder() {
+  // Reset state to empty
+  loadState({ actions: [], scale: 32, origin: { x: 0, y: 0 } });
+  resizeCanvas();
+  updateHistory();
+}
+
+function exitBuilder() {
+  builderState = { classId: null, mode: 'build', extractedSteps: [] };
+  $('#workspace-view').hidden = true;
+  $('#dashboard-view').hidden = false;
+  $('#builder-badge').hidden = true;
+  $('#builder-extract').hidden = true;
+  $('#builder-preview').hidden = true;
+  $('#builder-assign').hidden = true;
+  $('#back-button').hidden = true;
+  $('#builder-panel').hidden = true;
+  $('#builder-preview').textContent = 'Preview';
+  renderTeacherDashboard();
+}
+
+function toggleBuilderPreview() {
+  if (builderState.mode === 'build') {
+    builderState.mode = 'preview';
+    $('#builder-preview').textContent = 'Edit';
+    $('#builder-status').textContent = 'Preview mode — read only';
+    $('#builder-extract').hidden = true;
+    $('#builder-assign').hidden = true;
+    $('#builder-panel').hidden = true;
+    // Make canvas read-only by disabling tools
+    $$('.tool').forEach(t => t.classList.add('disabled'));
+    // Show exercise badge like student view
+    $('#exercise-badge').hidden = false;
+    $('#exercise-title').textContent = 'Preview: ' + ($('#doc-title').value || 'Exercise');
+    $('#exercise-class').textContent = 'Preview mode';
+    $('#submission-bar').hidden = true;
   } else {
-    const classId = $('#modal-class-pick').value;
-    if (!classId) { $('#modal-error').textContent = 'Select a class.'; return; }
-    const title = $('#modal-title-input').value.trim();
-    if (!title) { $('#modal-error').textContent = 'Enter an exercise title.'; return; }
-    const prompt = $('#modal-prompt').value.trim();
-    const stepsRaw = $('#modal-steps').value.trim();
-    const steps = parseSteps(stepsRaw);
-    const { error } = await supabase.from('exercises').insert({ class_id: classId, title, prompt, steps });
-    if (error) { $('#modal-error').textContent = error.message; return; }
-    closeModal();
-    $('#teacher-classes').dataset.selected = classId;
-    showToast(steps.length ? 'Exercise created with auto-check.' : 'Exercise created.');
-    await renderTeacherDashboard();
+    builderState.mode = 'build';
+    $('#builder-preview').textContent = 'Preview';
+    $('#builder-status').textContent = 'Build mode — draw the solution';
+    $('#builder-extract').hidden = false;
+    $('#builder-assign').hidden = false;
+    $('#builder-panel').hidden = false;
+    $$('.tool').forEach(t => t.classList.remove('disabled'));
+    $('#exercise-badge').hidden = true;
+    $('#submission-bar').hidden = true;
   }
 }
 
-// ---------- Admin ----------
+function extractSteps() {
+  const actions = state.actions || [];
+  if (!actions.length) { showToast('Draw something first.'); return; }
+  
+  // Count actions by type
+  const counts = {};
+  actions.forEach(a => { counts[a.type] = (counts[a.type] || 0) + 1; });
+  
+  // Map action types to step types (STEP_TYPES from autocheck.js)
+  const stepTypeMap = {
+    'line': 'line',
+    'ruler': 'ruler',
+    'set45': 'set-square',
+    'set60': 'set-square',
+    'point': 'point',
+    'circle': 'circle',
+    'compass': 'compass',
+    'protractor': 'angle',
+    'pencil': 'pencil',
+    'plot': 'plot',
+    'dividers': 'compass', // dividers count as compass
+    'label': 'point' // labeling a point
+  };
+  
+  builderState.extractedSteps = [];
+  Object.entries(counts).forEach(([type, count]) => {
+    const stepType = stepTypeMap[type];
+    if (stepType && STEP_TYPES.includes(stepType)) {
+      builderState.extractedSteps.push({ type: stepType, count, label: type });
+    }
+  });
+  
+  // Deduplicate by type (sum counts)
+  const merged = {};
+  builderState.extractedSteps.forEach(s => {
+    if (!merged[s.type] || merged[s.type].count < s.count) {
+      merged[s.type] = { type: s.type, count: s.count, label: s.label };
+    } else {
+      merged[s.type].count += s.count;
+    }
+  });
+  builderState.extractedSteps = Object.values(merged);
+  
+  renderBuilderSteps();
+  showToast(`Extracted ${builderState.extractedSteps.length} step type(s).`);
+}
+
+function renderBuilderSteps() {
+  const list = $('#builder-steps-list');
+  const empty = $('#builder-steps-empty');
+  list.innerHTML = '';
+  
+  if (!builderState.extractedSteps.length) {
+    empty.hidden = false;
+    return;
+  }
+  empty.hidden = true;
+  
+  builderState.extractedSteps.forEach((step, idx) => {
+    const li = document.createElement('li');
+    li.className = 'builder-step';
+    li.innerHTML = `
+      <span class="builder-step-type">${step.type}</span>
+      <span class="builder-step-count">×${step.count}</span>
+      <span class="builder-step-label">${step.label || step.type}</span>
+      <div class="builder-step-actions">
+        <button title="Edit" data-idx="${idx}" data-action="edit-step">✎</button>
+        <button title="Delete" data-idx="${idx}" data-action="delete-step">✕</button>
+      </div>
+    `;
+    list.appendChild(li);
+  });
+  
+  // Bind edit/delete
+  $$('#builder-steps-list [data-action="edit-step"]').forEach(btn => {
+    btn.addEventListener('click', () => editStep(btn.dataset.idx));
+  });
+  $$('#builder-steps-list [data-action="delete-step"]').forEach(btn => {
+    btn.addEventListener('click', () => deleteStep(btn.dataset.idx));
+  });
+}
+
+function editStep(idx) {
+  const step = builderState.extractedSteps[idx];
+  const newCount = prompt(`Count for "${step.type}" steps:`, step.count);
+  if (newCount !== null && !isNaN(newCount) && parseInt(newCount) > 0) {
+    step.count = parseInt(newCount);
+    renderBuilderSteps();
+  }
+}
+
+function deleteStep(idx) {
+  builderState.extractedSteps.splice(idx, 1);
+  renderBuilderSteps();
+}
+
+async function assignExercise() {
+  // Open assign modal with class pre-selected
+  await openAssignModal();
+}
+
+async function openAssignModal() {
+  // Reuse modal for assign, but with different fields
+  modalMode = 'assign';
+  $('#modal-title').textContent = 'Assign Exercise';
+  $('#modal-submit').textContent = 'Assign';
+  $('#modal-field-class-name').hidden = true;
+  $('#modal-field-class-pick').hidden = false;
+  $('#modal-field-title').hidden = false;
+  $('#modal-field-prompt').hidden = false;
+  $('#modal-field-steps').hidden = true; // steps come from builder
+  $('#modal-class-name').value = '';
+  $('#modal-title-input').value = $('#doc-title').value || 'Exercise';
+  $('#modal-prompt').value = '';
+  $('#modal-steps').value = '';
+  $('#modal-error').textContent = '';
+  await populateClassPick();
+  // Pre-select builder class
+  if (builderState.classId) $('#modal-class-pick').value = builderState.classId;
+  $('#modal-backdrop').hidden = false;
+  setTimeout(() => $('#modal-title-input').focus(), 30);
+}
+
+async function submitAssignModal() {
+  $('#modal-error').textContent = '';
+  const classId = $('#modal-class-pick').value;
+  if (!classId) { $('#modal-error').textContent = 'Select a class.'; return; }
+  const title = $('#modal-title-input').value.trim();
+  if (!title) { $('#modal-error').textContent = 'Enter an exercise title.'; return; }
+  const prompt = $('#modal-prompt').value.trim();
+  
+  // Convert builder steps to exercise steps format
+  const steps = builderState.extractedSteps.map(s => ({ type: s.type, count: s.count, label: s.label }));
+  
+  const { error } = await supabase.from('exercises').insert({ 
+    class_id: classId, 
+    title, 
+    prompt, 
+    steps 
+  });
+  if (error) { $('#modal-error').textContent = error.message; return; }
+  
+  closeModal();
+  exitBuilder();
+  showToast(steps.length ? 'Exercise assigned with auto-check.' : 'Exercise assigned.');
+  await renderTeacherDashboard();
+}
+
+// ---------- Modal (for class creation and assign) ----------
 
 async function renderAdminDashboard() {
   const [users, classes, exercises, submissions] = await Promise.all([
@@ -432,13 +665,27 @@ export function bindDashboardActions(onAuthSuccess) {
     await supabase.auth.signOut();
     onAuthSuccess(null);
   });
+  $('#classroom-button').addEventListener('click', () => {
+    showWorkspace();
+  });
   $('#new-class-button').addEventListener('click', createClass);
   $('#new-exercise-button').addEventListener('click', createExercise);
-  $('#modal-form').addEventListener('submit', e => { e.preventDefault(); submitModal(); });
-  $('#modal-cancel').addEventListener('click', closeModal);
+  
+  // Builder buttons
+  $('#builder-extract').addEventListener('click', extractSteps);
+  $('#builder-preview').addEventListener('click', toggleBuilderPreview);
+  $('#builder-assign').addEventListener('click', assignExercise);
+  $('#builder-close').addEventListener('click', exitBuilder);
+  $('#builder-extract-steps').addEventListener('click', extractSteps);
+  $('#builder-clear-steps').addEventListener('click', () => { builderState.extractedSteps = []; renderBuilderSteps(); });
+  $('#builder-preview-btn').addEventListener('click', toggleBuilderPreview);
+  $('#builder-assign-btn').addEventListener('click', assignExercise);
+  
+  $('#modal-form').addEventListener('submit', e => { e.preventDefault(); if (modalMode === 'assign') submitAssignModal(); else submitModal(); });
+  $('#modal-cancel').addEventListener('click', () => { if (modalMode === 'assign') closeModal(); else closeModal(); });
   $('#modal-close').addEventListener('click', closeModal);
   $('#modal-backdrop').addEventListener('click', e => { if (e.target === e.currentTarget) closeModal(); });
-  document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#modal-backdrop').hidden) closeModal(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#modal-backdrop').hidden) closeModal(); else if (e.key === 'Escape' && !$('#builder-panel').hidden) exitBuilder(); });
   $('#rotate-code-button').addEventListener('click', async () => {
     const code = await rotateTeacherAccessCode();
     $('#teacher-access-code').textContent = code || '——';
@@ -452,9 +699,14 @@ export function bindDashboardActions(onAuthSuccess) {
   $('#save-work-button').addEventListener('click', () => saveWork(false));
   $('#submit-work-button').addEventListener('click', () => saveWork(true));
   $('#back-button').addEventListener('click', () => {
-    window.__activeExercise = null;
-    window.__activeSubmission = null;
-    showDashboard(currentProfile);
+    if (window.__activeExercise || window.__activeSubmission) {
+      window.__activeExercise = null;
+      window.__activeSubmission = null;
+      if (currentProfile) showDashboard(currentProfile);
+      else showWorkspace();
+    } else {
+      showWorkspace();
+    }
   });
 }
 
