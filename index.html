@@ -89,6 +89,9 @@
             <button class="tool" data-tool="line" title="Straight line — click and drag">
               <span class="tool-icon line-icon"></span><span>Line</span><kbd>L</kbd>
             </button>
+            <button class="tool" data-tool="ray" title="Ray — starts at a point and extends forever in one direction">
+              <span class="tool-icon ray-icon"></span><span>Ray</span><kbd>T</kbd>
+            </button>
           </div>
           <div class="tool-group geometry-tools">
             <p class="panel-label">GEOMETRY SET</p>
@@ -316,7 +319,7 @@
             </label>
             <label id="modal-field-steps">Auto-check steps (comma-separated)
               <input id="modal-steps" type="text" placeholder="e.g. line, compass" autocomplete="off" />
-              <span class="modal-hint">Available: line, ruler, set-square, point, circle, compass, angle, protractor, pencil, plot. Leave blank for no auto-check.</span>
+              <span class="modal-hint">Available: line, ruler, set-square, ray, point, circle, compass, angle, protractor, pencil, plot. Leave blank for no auto-check.</span>
             </label>
           </div>
           <p class="auth-error" id="modal-error"></p>

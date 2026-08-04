@@ -4,19 +4,19 @@ import { beginPerpendicular, beginAnyPerpendicular, findReferenceLine, setConstr
 
 function eraseNear(w) {
   let best = -1, dist = Infinity;
-  state.actions.forEach((a, i) => { let d = Infinity; if (a.type === 'point') d = pointDistance(a.at, w); else if (a.type === 'circle') d = Math.abs(pointDistance(a.center, w) - a.radius); else if (a.type === 'pencil') d = Math.min(...a.points.map(p => pointDistance(p, w))); else if (a.type === 'compass') d = polylineDistance(w, a.points); else if (a.type === 'line' || a.type === 'ruler' || a.type === 'set-square') d = segmentDistance(w, a.from, a.to); else if (a.type === 'angle') d = Math.min(pointDistance(w, a.center), segmentDistance(w, a.center, a.end)); if (d < dist) { dist = d; best = i; } });
+  state.actions.forEach((a, i) => { let d = Infinity; if (a.type === 'point') d = pointDistance(a.at, w); else if (a.type === 'circle') d = Math.abs(pointDistance(a.center, w) - a.radius); else if (a.type === 'pencil') d = Math.min(...a.points.map(p => pointDistance(p, w))); else if (a.type === 'compass') d = polylineDistance(w, a.points); else if (a.type === 'line' || a.type === 'ruler' || a.type === 'set-square' || a.type === 'ray') d = segmentDistance(w, a.from, a.to); else if (a.type === 'angle') d = Math.min(pointDistance(w, a.center), segmentDistance(w, a.center, a.end)); if (d < dist) { dist = d; best = i; } });
   if (best >= 0 && dist < .55) { state.redo = []; state.actions.splice(best, 1); updateHistory(); render(); showToast('Mark erased'); } else showToast('No mark close enough to erase');
 }
 function pickAction(w) {
   let best = -1, bestD = Infinity;
-  state.actions.forEach((a, i) => { let d = Infinity; if (a.type === 'point') d = pointDistance(a.at, w); else if (a.type === 'circle') d = Math.min(pointDistance(a.center, w), Math.abs(pointDistance(a.center, w) - a.radius)); else if (a.type === 'pencil') d = Math.min(...a.points.map(p => pointDistance(p, w))); else if (a.type === 'compass') d = polylineDistance(w, a.points); else if (a.type === 'line' || a.type === 'ruler' || a.type === 'set-square') d = segmentDistance(w, a.from, a.to); else if (a.type === 'angle') d = Math.min(pointDistance(w, a.center), segmentDistance(w, a.center, a.end)); if (d < bestD) { bestD = d; best = i; } }); return best >= 0 && bestD < .55 ? state.actions[best] : null;
+  state.actions.forEach((a, i) => { let d = Infinity; if (a.type === 'point') d = pointDistance(a.at, w); else if (a.type === 'circle') d = Math.min(pointDistance(a.center, w), Math.abs(pointDistance(a.center, w) - a.radius)); else if (a.type === 'pencil') d = Math.min(...a.points.map(p => pointDistance(p, w))); else if (a.type === 'compass') d = polylineDistance(w, a.points); else if (a.type === 'line' || a.type === 'ruler' || a.type === 'set-square' || a.type === 'ray') d = segmentDistance(w, a.from, a.to); else if (a.type === 'angle') d = Math.min(pointDistance(w, a.center), segmentDistance(w, a.center, a.end)); if (d < bestD) { bestD = d; best = i; } }); return best >= 0 && bestD < .55 ? state.actions[best] : null;
 }
 function applyMove(a, dx, dy) {
   if (a.type === 'point') { a.at.x += dx; a.at.y += dy; if (a.label && a.label[0] === '(') a.label = `(${pretty(a.at.x)}, ${pretty(a.at.y)})`; return; }
   if (a.type === 'circle') { a.center.x += dx; a.center.y += dy; return; }
   if (a.type === 'compass') { a.center.x += dx; a.center.y += dy; a.points.forEach(p => { p.x += dx; p.y += dy }); return; }
   if (a.type === 'pencil') { a.points.forEach(p => { p.x += dx; p.y += dy }); return; }
-  if (a.type === 'line' || a.type === 'ruler' || a.type === 'set-square') { a.from.x += dx; a.from.y += dy; a.to.x += dx; a.to.y += dy; return; }
+  if (a.type === 'line' || a.type === 'ruler' || a.type === 'set-square' || a.type === 'ray') { a.from.x += dx; a.from.y += dy; a.to.x += dx; a.to.y += dy; return; }
   if (a.type === 'angle') { a.center.x += dx; a.center.y += dy; a.end.x += dx; a.end.y += dy; }
 }
 function pickPointNear(w) { let best = null, bestD = Infinity; state.actions.forEach(a => { if (a.type !== 'point') return; const d = pointDistance(a.at, w); if (d < bestD) { bestD = d; best = a; } }); return best && bestD < .55 ? best : null; }
@@ -39,7 +39,7 @@ function endDraw(e) {
   if (!state.drawing) return; const a = state.drawing; state.drawing = null; canvas.style.cursor = canvasCursor();
   if (a.type === 'pan') { render(); return; }
   if (a.type === 'pencil' && a.points.length < 2) { render(); return; }
-  if ((a.type === 'line' || a.type === 'ruler' || a.type === 'set-square') && pointDistance(a.from, a.to) < .1) { render(); return; }
+  if ((a.type === 'line' || a.type === 'ruler' || a.type === 'set-square' || a.type === 'ray') && pointDistance(a.from, a.to) < .1) { render(); return; }
   if (a.type === 'compass' && a.points.length < 2) { state.compassCarryRadius = a.radius; setToolTip('Compass opening held', 'Sweep the pencil leg to draw the arc, or press Esc to move the needle with this span.', [['Esc', 'replant, keeping span'], ['X', 'release opening']]); render(); showToast('Opening held in place — sweep to draw, Esc to move, X to release.'); return; }
   if (a.type === 'angle' && pointDistance(a.center, a.end) < .1) { render(); return; }
   if (a.type === 'compass') { state.compassCarryRadius = a.radius; setToolTip('Compass opening held', 'Move the needle to a new centre to keep this span, or release it.', [['Esc', 'replant, keeping span'], ['X', 'release opening']]); }
@@ -71,7 +71,7 @@ canvas.addEventListener('pointerdown', e => {
     const radius = state.compassCarryRadius || pointDistance(state.compassAnchor, w); if (!state.compassCarryRadius && radius < .22) { state.compassAnchor = w; render(); return; }
     const angle = Math.atan2(w.y - state.compassAnchor.y, w.x - state.compassAnchor.x), pencil = { x: state.compassAnchor.x + radius * Math.cos(angle), y: state.compassAnchor.y + radius * Math.sin(angle) }; state.drawing = { type: 'compass', center: state.compassAnchor, radius, angles: [angle], points: [pencil], color: state.color }; render(); return;
   }
-  const types = { pencil: 'pencil', line: 'line', ruler: 'ruler', set45: 'set-square', set60: 'set-square', protractor: 'angle' }; const type = types[state.tool] || 'pencil';
+  const types = { pencil: 'pencil', line: 'line', ray: 'ray', ruler: 'ruler', set45: 'set-square', set60: 'set-square', protractor: 'angle' }; const type = types[state.tool] || 'pencil';
   state.drawing = type === 'pencil' ? { type, points: [w], color: state.color } : type === 'set-square' ? { type, square: state.tool === 'set45' ? '45' : '60', color: state.color, from: w, to: w } : { type, color: state.color, from: w, to: w, center: w, end: w, radius: 0 }; render();
 });
 canvas.addEventListener('pointermove', e => {
@@ -83,7 +83,7 @@ canvas.addEventListener('pointermove', e => {
   else a.to = w; render();
 });
 canvas.addEventListener('pointerup', endDraw); canvas.addEventListener('pointercancel', endDraw); canvas.addEventListener('pointerleave', () => { state.hovering = false; });
-canvas.addEventListener('wheel', e => { e.preventDefault(); state.scale = clampScale(state.scale * (e.deltaY < 0 ? 1.12 : .89)); state.origin = { x: state.canvasSize.width / 2, y: state.canvasSize.height / 2 }; $('#scale-readout').textContent = `1 unit = ${state.scale < 10 ? state.scale.toFixed(2) : Math.round(state.scale)} px`; render(); }, { passive: false });
+canvas.addEventListener('wheel', e => { e.preventDefault(); const s = eventPoint(e), anchor = screenToWorld(s); state.scale = clampScale(state.scale * (e.deltaY < 0 ? 1.12 : .89)); state.origin = { x: s.x - anchor.x * state.scale, y: s.y + anchor.y * state.scale }; $('#scale-readout').textContent = `1 unit = ${state.scale < 10 ? state.scale.toFixed(2) : Math.round(state.scale)} px`; render(); }, { passive: false });
 
 $$('.tool').forEach(b => b.addEventListener('click', () => setTool(b.dataset.tool)));
 $('#perpendicular-button').addEventListener('click', beginPerpendicular);
@@ -108,5 +108,5 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape' && state.divider) { state.divider = null; render(); showToast('Dividers lifted'); return; }
   if (e.code === 'Space') { e.preventDefault(); setTool('hand'); }
   const key = e.key.toLowerCase(); if (key === 'x' && (state.compassCarryRadius || state.divider)) { state.compassAnchor = null; state.compassCarryRadius = null; state.divider = null; const [name, copy] = toolCopy[state.tool]; setToolTip(name, copy); render(); showToast('Instrument opening released'); return; }
-  const keys = { p: 'pencil', o: 'point', n: 'label', l: 'line', r: 'ruler', c: 'compass', d: 'dividers', q: 'set45', w: 'set60', a: 'protractor', m: 'move', h: 'hand', e: 'eraser' }; if (keys[key]) setTool(keys[key]);
+  const keys = { p: 'pencil', o: 'point', n: 'label', l: 'line', t: 'ray', r: 'ruler', c: 'compass', d: 'dividers', q: 'set45', w: 'set60', a: 'protractor', m: 'move', h: 'hand', e: 'eraser' }; if (keys[key]) setTool(keys[key]);
 });
