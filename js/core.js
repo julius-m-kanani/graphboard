@@ -38,6 +38,9 @@ export const toolCopy = {
   protractor: ['Protractor', 'Draw an angle from the positive x-axis.'], hand: ['Move paper', 'Drag the graph paper to a better position.'], eraser: ['Rubber / eraser', 'Click a nearby mark to rub it out.'], move: ['Move', 'Click a mark and drag it to a new position.']
 };
 
+export const scaleMin = 0.25, scaleMax = 84;
+export function clampScale(s) { return Math.max(scaleMin, Math.min(scaleMax, s)); }
+
 export const screenToWorld = (p) => ({ x: (p.x - state.origin.x) / state.scale, y: (state.origin.y - p.y) / state.scale });
 export const worldToScreen = (p) => ({ x: state.origin.x + p.x * state.scale, y: state.origin.y - p.y * state.scale });
 export const snap = (p) => state.snapStep ? { x: Math.round(p.x / state.snapStep) * state.snapStep, y: Math.round(p.y / state.snapStep) * state.snapStep } : p;

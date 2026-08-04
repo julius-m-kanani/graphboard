@@ -1,7 +1,7 @@
 import { canvas, paperWrap, ctx, state, screenToWorld, worldToScreen, pretty, pointDistance, render, registerRender } from './core.js';
 
 function minorGridStep() {
-  const candidates = [0.05, 0.1, 0.125, 0.2, 0.25, 0.5, 1, 2, 5, 10];
+  const candidates = [0.05, 0.1, 0.125, 0.2, 0.25, 0.5, 1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000];
   for (const s of candidates) if (s * state.scale >= 9) return s;
   return candidates[candidates.length - 1];
 }
@@ -47,6 +47,7 @@ function renderGrid() {
 }
 function renderLabels() {
   const { width, height } = state.canvasSize; const min = screenToWorld({ x: 0, y: height }), max = screenToWorld({ x: width, y: 0 });
+  if (max.x - min.x > 600 || max.y - min.y > 600) return;
   ctx.save(); ctx.fillStyle = '#718088'; ctx.font = '10px "DM Mono", monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
   for (let x = Math.ceil(min.x); x <= Math.floor(max.x); x++) { if (x && x % 1 === 0) { const p = worldToScreen({ x, y: 0 }); if (p.x > 12 && p.x < width - 12) { ctx.fillText(x, p.x, Math.min(height - 14, Math.max(4, state.origin.y + 6))); } } }
   ctx.textAlign = 'right'; ctx.textBaseline = 'middle';

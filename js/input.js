@@ -1,4 +1,4 @@
-import { $, $$, canvas, paperWrap, state, screenToWorld, worldToScreen, snap, pretty, pointDistance, eventPoint, polylineDistance, segmentDistance, closestPointOnSegment, showToast, setTool, setToolTip, canvasCursor, toolCopy, updateReadout, render } from './core.js';
+import { $, $$, canvas, paperWrap, state, screenToWorld, worldToScreen, snap, pretty, pointDistance, eventPoint, polylineDistance, segmentDistance, closestPointOnSegment, showToast, setTool, setToolTip, canvasCursor, toolCopy, updateReadout, render, clampScale } from './core.js';
 import { commit, undo, redo, updateHistory } from './history.js';
 import { beginPerpendicular, beginAnyPerpendicular, findReferenceLine, setConstructionLine, constrainSetSquare, updateConstructionPanel } from './construction.js';
 
@@ -26,7 +26,7 @@ function showLabelEditor(world, existing) {
   const cancel = () => { if (done) return; done = true; input.remove(); render(); };
   input.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') finish(); else if (e.key === 'Escape') cancel(); }); input.addEventListener('blur', finish); paperWrap.appendChild(input); input.focus(); input.select();
 }
-function zoomBy(f) { state.scale = Math.max(15, Math.min(84, state.scale * f)); state.origin = { x: state.canvasSize.width / 2, y: state.canvasSize.height / 2 }; $('#scale-readout').textContent = `1 unit = ${Math.round(state.scale)} px`; render(); }
+function zoomBy(f) { state.scale = clampScale(state.scale * f); state.origin = { x: state.canvasSize.width / 2, y: state.canvasSize.height / 2 }; $('#scale-readout').textContent = `1 unit = ${state.scale < 10 ? state.scale.toFixed(2) : Math.round(state.scale)} px`; render(); }
 export function compileExpression(raw) {
   let expr = raw.trim().toLowerCase().replace(/^y\s*=\s*/, '').replace(/[×]/g, '*').replace(/[÷]/g, '/').replace(/\^/g, '**'); if (!expr) throw Error('Enter an equation first'); if (/[^0-9a-z+\-*/().,\s]/.test(expr)) throw Error('Use numbers, x, and standard operators only');
   const allowed = new Set(['x', 'sin', 'cos', 'tan', 'asin', 'acos', 'atan', 'abs', 'sqrt', 'log', 'ln', 'exp', 'pi', 'e']); const words = expr.match(/[a-z]+/g) || []; if (words.some(w => !allowed.has(w))) throw Error('Try x, sin, cos, sqrt, or other standard functions');
@@ -83,7 +83,7 @@ canvas.addEventListener('pointermove', e => {
   else a.to = w; render();
 });
 canvas.addEventListener('pointerup', endDraw); canvas.addEventListener('pointercancel', endDraw); canvas.addEventListener('pointerleave', () => { state.hovering = false; });
-canvas.addEventListener('wheel', e => { e.preventDefault(); state.scale = Math.max(15, Math.min(84, state.scale * (e.deltaY < 0 ? 1.12 : .89))); state.origin = { x: state.canvasSize.width / 2, y: state.canvasSize.height / 2 }; $('#scale-readout').textContent = `1 unit = ${Math.round(state.scale)} px`; render(); }, { passive: false });
+canvas.addEventListener('wheel', e => { e.preventDefault(); state.scale = clampScale(state.scale * (e.deltaY < 0 ? 1.12 : .89)); state.origin = { x: state.canvasSize.width / 2, y: state.canvasSize.height / 2 }; $('#scale-readout').textContent = `1 unit = ${state.scale < 10 ? state.scale.toFixed(2) : Math.round(state.scale)} px`; render(); }, { passive: false });
 
 $$('.tool').forEach(b => b.addEventListener('click', () => setTool(b.dataset.tool)));
 $('#perpendicular-button').addEventListener('click', beginPerpendicular);
@@ -96,7 +96,7 @@ $('#grid-toggle').addEventListener('click', () => { state.showGrid = !state.show
 $$('.segmented button[data-snap]').forEach(b => b.addEventListener('click', () => { state.snapStep = Number(b.dataset.snap); $$('.segmented button[data-snap]').forEach(x => x.classList.toggle('active', x === b)); }));
 $('#labels-toggle').addEventListener('change', e => { state.showLabels = e.target.checked; render(); });
 $$('.segmented button[data-paper]').forEach(b => b.addEventListener('click', () => { state.paper = b.dataset.paper; $$('.segmented button[data-paper]').forEach(x => x.classList.toggle('active', x === b)); render(); }));
-$('#apply-range').addEventListener('click', () => { const xmin = Number($('#x-min').value), xmax = Number($('#x-max').value), ymin = Number($('#y-min').value), ymax = Number($('#y-max').value); if (![xmin, xmax, ymin, ymax].every(Number.isFinite) || xmax <= xmin || ymax <= ymin) { showToast('Enter a valid minimum and maximum range'); return; } const width = state.canvasSize.width, height = state.canvasSize.height; state.scale = Math.max(15, Math.min(84, Math.min(width / (xmax - xmin), height / (ymax - ymin)))); state.origin = { x: -xmin * state.scale + (width - (xmax - xmin) * state.scale) / 2, y: ymax * state.scale + (height - (ymax - ymin) * state.scale) / 2 }; $('#scale-readout').textContent = `1 unit = ${Math.round(state.scale)} px`; render(); });
+$('#apply-range').addEventListener('click', () => { const xmin = Number($('#x-min').value), xmax = Number($('#x-max').value), ymin = Number($('#y-min').value), ymax = Number($('#y-max').value); if (![xmin, xmax, ymin, ymax].every(Number.isFinite) || xmax <= xmin || ymax <= ymin) { showToast('Enter a valid minimum and maximum range'); return; } const width = state.canvasSize.width, height = state.canvasSize.height; state.scale = clampScale(Math.min(width / (xmax - xmin), height / (ymax - ymin))); state.origin = { x: -xmin * state.scale + (width - (xmax - xmin) * state.scale) / 2, y: ymax * state.scale + (height - (ymax - ymin) * state.scale) / 2 }; $('#scale-readout').textContent = `1 unit = ${state.scale < 10 ? state.scale.toFixed(2) : Math.round(state.scale)} px`; render(); });
 $('#plot-button').addEventListener('click', plotEquation); $('#expression-input').addEventListener('keydown', e => { if (e.key === 'Enter') plotEquation() });
 $('#equation-help').addEventListener('click', () => showToast('Examples: 2*x + 1, x^2 - 4, sin(x). Use radians for trig.'));
 $('#export-button').addEventListener('click', () => { render(); const exportCanvas = document.createElement('canvas'); exportCanvas.width = canvas.width; exportCanvas.height = canvas.height; const ex = exportCanvas.getContext('2d'); ex.drawImage(canvas, 0, 0); const a = document.createElement('a'); a.download = `${$('.document-name input').value.trim() || 'graphboard'}.png`; a.href = exportCanvas.toDataURL('image/png'); a.click(); showToast('Graph exported as a PNG'); });
