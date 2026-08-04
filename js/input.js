@@ -26,7 +26,7 @@ function showLabelEditor(world, existing) {
   const cancel = () => { if (done) return; done = true; input.remove(); render(); };
   input.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') finish(); else if (e.key === 'Escape') cancel(); }); input.addEventListener('blur', finish); paperWrap.appendChild(input); input.focus(); input.select();
 }
-function zoomBy(f) { const c = { x: state.canvasSize.width / 2, y: state.canvasSize.height / 2 }, w = screenToWorld(c); state.scale = Math.max(15, Math.min(84, state.scale * f)); state.origin = { x: c.x - w.x * state.scale, y: c.y + w.y * state.scale }; $('#scale-readout').textContent = `1 unit = ${Math.round(state.scale)} px`; render(); }
+function zoomBy(f) { state.scale = Math.max(15, Math.min(84, state.scale * f)); state.origin = { x: state.canvasSize.width / 2, y: state.canvasSize.height / 2 }; $('#scale-readout').textContent = `1 unit = ${Math.round(state.scale)} px`; render(); }
 export function compileExpression(raw) {
   let expr = raw.trim().toLowerCase().replace(/^y\s*=\s*/, '').replace(/[×]/g, '*').replace(/[÷]/g, '/').replace(/\^/g, '**'); if (!expr) throw Error('Enter an equation first'); if (/[^0-9a-z+\-*/().,\s]/.test(expr)) throw Error('Use numbers, x, and standard operators only');
   const allowed = new Set(['x', 'sin', 'cos', 'tan', 'asin', 'acos', 'atan', 'abs', 'sqrt', 'log', 'ln', 'exp', 'pi', 'e']); const words = expr.match(/[a-z]+/g) || []; if (words.some(w => !allowed.has(w))) throw Error('Try x, sin, cos, sqrt, or other standard functions');
@@ -83,7 +83,7 @@ canvas.addEventListener('pointermove', e => {
   else a.to = w; render();
 });
 canvas.addEventListener('pointerup', endDraw); canvas.addEventListener('pointercancel', endDraw); canvas.addEventListener('pointerleave', () => { state.hovering = false; });
-canvas.addEventListener('wheel', e => { e.preventDefault(); const before = screenToWorld(eventPoint(e)); const next = Math.max(15, Math.min(84, state.scale * (e.deltaY < 0 ? 1.12 : .89))); state.scale = next; const p = eventPoint(e); state.origin = { x: p.x - before.x * next, y: p.y + before.y * next }; $('#scale-readout').textContent = `1 unit = ${Math.round(next)} px`; render(); }, { passive: false });
+canvas.addEventListener('wheel', e => { e.preventDefault(); state.scale = Math.max(15, Math.min(84, state.scale * (e.deltaY < 0 ? 1.12 : .89))); state.origin = { x: state.canvasSize.width / 2, y: state.canvasSize.height / 2 }; $('#scale-readout').textContent = `1 unit = ${Math.round(state.scale)} px`; render(); }, { passive: false });
 
 $$('.tool').forEach(b => b.addEventListener('click', () => setTool(b.dataset.tool)));
 $('#perpendicular-button').addEventListener('click', beginPerpendicular);
