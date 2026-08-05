@@ -54,19 +54,13 @@ function renderLabels() {
   for (let y = Math.ceil(min.y); y <= Math.floor(max.y); y++) { if (y && y % 1 === 0) { const p = worldToScreen({ x: 0, y }); if (p.y > 9 && p.y < height - 9) { ctx.fillText(y, Math.min(width - 3, Math.max(17, state.origin.x - 6)), p.y); } } }
   ctx.fillStyle = '#4b636a'; ctx.font = 'italic 12px Georgia,serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'bottom'; ctx.fillText('x', width - 14, Math.max(13, state.origin.y - 5)); ctx.fillText('y', state.origin.x + 7, 13); ctx.restore();
 }
-function rayClip(p, d, width, height) {
-  let best = null; const add = (t, point) => { if (t > 0 && point.x >= -1 && point.x <= width + 1 && point.y >= -1 && point.y <= height + 1 && (!best || t < best.t)) best = { t, point }; };
-  if (Math.abs(d.x) > 1e-9) { add((0 - p.x) / d.x, { x: 0, y: p.y + d.y * (0 - p.x) / d.x }); add((width - p.x) / d.x, { x: width, y: p.y + d.y * (width - p.x) / d.x }); }
-  if (Math.abs(d.y) > 1e-9) { add((0 - p.y) / d.y, { x: p.x + d.x * (0 - p.y) / d.y, y: 0 }); add((height - p.y) / d.y, { x: p.x + d.x * (height - p.y) / d.y, y: height }); }
-  return best ? best.point : null;
-}
 function drawAction(a, preview = false) {
   ctx.save(); ctx.strokeStyle = a.color; ctx.fillStyle = a.color; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
   if (a.type === 'pencil') { if (a.points.length < 2) { ctx.restore(); return; } ctx.lineWidth = 1.8; ctx.beginPath(); a.points.forEach((p, i) => { const s = worldToScreen(p); i ? ctx.lineTo(s.x, s.y) : ctx.moveTo(s.x, s.y) }); ctx.stroke(); }
   if (a.type === 'point') { const p = worldToScreen(a.at); ctx.beginPath(); ctx.arc(p.x, p.y, 4.1, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#fffefa'; ctx.beginPath(); ctx.arc(p.x, p.y, 1.2, 0, Math.PI * 2); ctx.fill(); if (a.label) { ctx.font = '11px "DM Mono",monospace'; ctx.fillStyle = a.color; ctx.fillText(a.label, p.x + 7, p.y - 7); } }
   if (a.type === 'ray') {
-    const { width, height } = state.canvasSize; const p1 = worldToScreen(a.from), p2 = worldToScreen(a.to); const dx = p2.x - p1.x, dy = p2.y - p1.y, len = Math.hypot(dx, dy);
-    if (len >= 2) { const ux = dx / len, uy = dy / len, end = rayClip(p1, { x: ux, y: uy }, width, height) || { x: p1.x + ux * (width + height), y: p1.y + uy * (width + height) }; ctx.lineCap = 'butt'; ctx.setLineDash([2, 4]); ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(end.x, end.y); ctx.stroke(); ctx.setLineDash([]); ctx.lineCap = 'round'; ctx.font = '10px "DM Mono",monospace'; ctx.fillStyle = a.color; ctx.fillText(`${pretty(pointDistance(a.from, a.to))} u`, (p1.x + p2.x) / 2 + 6, (p1.y + p2.y) / 2 - 6); }
+    const p1 = worldToScreen(a.from), p2 = worldToScreen(a.to); const dx = p2.x - p1.x, dy = p2.y - p1.y, len = Math.hypot(dx, dy);
+    if (len >= 2) { ctx.lineCap = 'butt'; ctx.setLineDash([2, 4]); ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke(); ctx.setLineDash([]); ctx.lineCap = 'round'; ctx.font = '10px "DM Mono",monospace'; ctx.fillStyle = a.color; ctx.fillText(`${pretty(pointDistance(a.from, a.to))} u`, (p1.x + p2.x) / 2 + 6, (p1.y + p2.y) / 2 - 6); }
   }
   if (a.type === 'line' || a.type === 'ruler' || a.type === 'set-square') { const p1 = worldToScreen(a.from), p2 = worldToScreen(a.to); ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke(); if (a.type === 'ruler' && preview) drawRuler(p1, p2); if (a.type === 'set-square' && preview) drawSetSquare(p1, p2, a.square); }
   if (a.type === 'circle') { const p = worldToScreen(a.center); ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(p.x, p.y, a.radius * state.scale, 0, Math.PI * 2); ctx.stroke(); ctx.fillStyle = '#fffefa'; ctx.beginPath(); ctx.arc(p.x, p.y, 2.6, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = a.color; ctx.lineWidth = 1.3; ctx.stroke(); }
