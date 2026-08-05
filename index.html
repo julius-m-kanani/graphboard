@@ -126,6 +126,27 @@
               <span class="tool-icon eraser-icon"></span><span>Rubber / eraser</span><kbd>E</kbd>
             </button>
           </div>
+          <div class="tool-group">
+            <p class="panel-label">SHAPES</p>
+            <button class="tool" data-tool="square" title="Square — drag to size, sides stay equal">
+              <span class="tool-icon shape-icon square-icon"></span><span>Square</span>
+            </button>
+            <button class="tool" data-tool="rectangle" title="Rectangle — drag to set width and height">
+              <span class="tool-icon shape-icon rectangle-icon"></span><span>Rectangle</span>
+            </button>
+            <button class="tool" data-tool="triangle" title="Equilateral triangle — drag to size">
+              <span class="tool-icon shape-icon triangle-icon"></span><span>Triangle</span>
+            </button>
+            <button class="tool" data-tool="pentagon" title="Pentagon — drag to size">
+              <span class="tool-icon shape-icon pentagon-icon"></span><span>Pentagon</span>
+            </button>
+            <button class="tool" data-tool="hexagon" title="Hexagon — drag to size">
+              <span class="tool-icon shape-icon hexagon-icon"></span><span>Hexagon</span>
+            </button>
+            <button class="tool" data-tool="star" title="Star — drag to size">
+              <span class="tool-icon shape-icon star-icon"></span><span>Star</span>
+            </button>
+          </div>
           <div class="tool-group tool-colors">
             <p class="panel-label">INK</p>
             <div class="color-row" role="group" aria-label="Ink colour">
@@ -319,7 +340,7 @@
             </label>
             <label id="modal-field-steps">Auto-check steps (comma-separated)
               <input id="modal-steps" type="text" placeholder="e.g. line, compass" autocomplete="off" />
-              <span class="modal-hint">Available: line, ruler, set-square, ray, point, circle, compass, angle, protractor, pencil, plot. Leave blank for no auto-check.</span>
+              <span class="modal-hint">Available: line, ruler, set-square, ray, point, circle, compass, angle, protractor, pencil, plot, square, rectangle, triangle, pentagon, hexagon, star. Leave blank for no auto-check.</span>
             </label>
           </div>
           <p class="auth-error" id="modal-error"></p>

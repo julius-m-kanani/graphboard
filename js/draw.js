@@ -1,4 +1,4 @@
-import { canvas, paperWrap, ctx, state, screenToWorld, worldToScreen, pretty, pointDistance, render, registerRender } from './core.js';
+import { canvas, paperWrap, ctx, state, screenToWorld, worldToScreen, pretty, pointDistance, render, registerRender, SHAPES, shapeVertices } from './core.js';
 
 function minorGridStep() {
   const candidates = [0.05, 0.1, 0.125, 0.2, 0.25, 0.5, 1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000];
@@ -62,6 +62,7 @@ function drawAction(a, preview = false) {
     const p1 = worldToScreen(a.from), p2 = worldToScreen(a.to); const dx = p2.x - p1.x, dy = p2.y - p1.y, len = Math.hypot(dx, dy);
     if (len >= 2) { ctx.lineCap = 'butt'; ctx.setLineDash([2, 4]); ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke(); ctx.setLineDash([]); ctx.lineCap = 'round'; }
   }
+  if (SHAPES.includes(a.type)) { const pts = shapeVertices(a.type, a.from, a.to).map(worldToScreen); if (pts.length) { ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y); for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y); ctx.closePath(); ctx.stroke(); } }
   if (a.type === 'line' || a.type === 'ruler' || a.type === 'set-square') { const p1 = worldToScreen(a.from), p2 = worldToScreen(a.to); ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke(); if (a.type === 'ruler' && preview) drawRuler(p1, p2); if (a.type === 'set-square' && preview) drawSetSquare(p1, p2, a.square); }
   if (a.type === 'circle') { const p = worldToScreen(a.center); ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(p.x, p.y, a.radius * state.scale, 0, Math.PI * 2); ctx.stroke(); ctx.fillStyle = '#fffefa'; ctx.beginPath(); ctx.arc(p.x, p.y, 2.6, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = a.color; ctx.lineWidth = 1.3; ctx.stroke(); }
   if (a.type === 'compass') { if (a.points.length > 1) { ctx.lineWidth = 2.2; ctx.beginPath(); a.points.forEach((p, i) => { const s = worldToScreen(p); i ? ctx.lineTo(s.x, s.y) : ctx.moveTo(s.x, s.y) }); ctx.stroke(); } }
