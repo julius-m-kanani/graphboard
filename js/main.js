@@ -4,17 +4,45 @@ import './history.js';
 import './input.js';
 import { resizeCanvas } from './draw.js';
 import { updateHistory } from './history.js';
-import { state } from './core.js';
+import { state, loadState, render, $, showToast } from './core.js';
 import { supabase, getProfile } from './supabase.js';
 import { showAuthView, attachAuthHandlers } from './auth.js';
 import { showDashboard, bindDashboardActions } from './dashboard.js';
-import { serializeState } from './serialize.js';
+import { serializeState, deserializeState } from './serialize.js';
 
 window.__serializeState = () => serializeState(state);
 
 window.addEventListener('resize', resizeCanvas);
 resizeCanvas();
 updateHistory();
+
+document.getElementById('save-session-button')?.addEventListener('click', () => {
+  const blob = new Blob([JSON.stringify(serializeState(state), null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.download = `${$('.document-name input').value.trim() || 'graphboard'}-session.json`;
+  a.href = URL.createObjectURL(blob);
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  showToast('Session saved to your device');
+});
+document.getElementById('open-session-button')?.addEventListener('click', () => {
+  const input = document.createElement('input'); input.type = 'file'; input.accept = '.json,application/json';
+  input.onchange = () => {
+    const file = input.files[0]; if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const loaded = deserializeState(JSON.parse(reader.result));
+        loadState(loaded);
+        updateHistory();
+        render();
+        showToast('Session loaded');
+      } catch (err) { showToast('Could not load that session'); }
+    };
+    reader.readAsText(file);
+  };
+  input.click();
+});
 
 function withTimeout(promise, ms) {
   return new Promise((resolve, reject) => {

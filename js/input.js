@@ -76,7 +76,7 @@ canvas.addEventListener('pointerdown', e => {
     const radius = state.compassCarryRadius || pointDistance(state.compassAnchor, w); if (!state.compassCarryRadius && radius < .22) { state.compassAnchor = w; render(); return; }
     const angle = Math.atan2(w.y - state.compassAnchor.y, w.x - state.compassAnchor.x), pencil = { x: state.compassAnchor.x + radius * Math.cos(angle), y: state.compassAnchor.y + radius * Math.sin(angle) }; state.drawing = { type: 'compass', center: state.compassAnchor, radius, angles: [angle], points: [pencil], color: state.color }; render(); return;
   }
-  const types = { pencil: 'pencil', line: 'line', ray: 'ray', ruler: 'ruler', set45: 'set-square', set60: 'set-square', protractor: 'angle', square: 'square', rectangle: 'rectangle', triangle: 'triangle', pentagon: 'pentagon', hexagon: 'hexagon', star: 'star' }; const type = types[state.tool] || 'pencil';
+  const types = { pencil: 'pencil', line: 'line', ray: 'ray', ruler: 'ruler', set45: 'set-square', set60: 'set-square', protractor: 'angle', square: 'square', rectangle: 'rectangle', triangle: 'triangle', 'right-triangle': 'right-triangle', parallelogram: 'parallelogram', rhombus: 'rhombus', trapezoid: 'trapezoid', pentagon: 'pentagon', hexagon: 'hexagon', octagon: 'octagon', star: 'star', circle: 'circle', ellipse: 'ellipse', arrow: 'arrow', 'double-arrow': 'double-arrow' }; const type = types[state.tool] || 'pencil';
   state.drawing = type === 'pencil' ? { type, points: [w], color: state.color } : type === 'set-square' ? { type, square: state.tool === 'set45' ? '45' : '60', color: state.color, from: w, to: w } : { type, color: state.color, from: w, to: w, center: w, end: w, radius: 0 }; render();
 });
 canvas.addEventListener('pointermove', e => {

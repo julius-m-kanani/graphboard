@@ -1,7 +1,7 @@
 // Auto-check engine: scores a student's saved actions against the exercise's
 // steps. A step is { type, count, label }. Scoring is additive: a step is
 // satisfied if at least `count` actions of that type exist on the page.
-export const STEP_TYPES = ['line', 'ruler', 'set-square', 'ray', 'point', 'circle', 'compass', 'angle', 'protractor', 'pencil', 'plot', 'square', 'rectangle', 'triangle', 'pentagon', 'hexagon', 'star'];
+export const STEP_TYPES = ['line', 'ruler', 'set-square', 'ray', 'point', 'circle', 'compass', 'angle', 'protractor', 'pencil', 'plot', 'square', 'rectangle', 'triangle', 'right-triangle', 'parallelogram', 'rhombus', 'trapezoid', 'pentagon', 'hexagon', 'octagon', 'star', 'ellipse', 'arrow', 'double-arrow'];
 
 export function parseSteps(raw) {
   if (Array.isArray(raw)) return raw.filter(s => s && STEP_TYPES.includes(s.type));
