@@ -30,7 +30,7 @@ export function loadState(data) {
 }
 
 export const toolCopy = {
-  pencil: ['Pencil', 'Draw naturally on the paper.'], point: ['Point', 'Place a precise coordinate point.'], label: ['Label', 'Click a point to rename it, or click empty space to place a labelled point.'],
+  pencil: ['Pencil', 'Draw naturally on the paper.'], point: ['Point', 'Place a point, labelled A, B, C… in turn.'], label: ['Label', 'Click a point to rename it, or click empty space to place a labelled point.'],
   line: ['Straight line', 'Drag from one coordinate to another.'], ray: ['Dotted line', 'Drag from one point to another to draw a dotted line with a measured length.'],
   ruler: ['Ruler', 'A guide appears as you draw a measured line.'],
   compass: ['Compass', 'Click to plant the needle. Its opening stays fixed after an arc; press Esc to move it, or X to release it.'],

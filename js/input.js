@@ -20,6 +20,11 @@ function applyMove(a, dx, dy) {
   if (a.type === 'angle') { a.center.x += dx; a.center.y += dy; a.end.x += dx; a.end.y += dy; }
 }
 function pickPointNear(w) { let best = null, bestD = Infinity; state.actions.forEach(a => { if (a.type !== 'point') return; const d = pointDistance(a.at, w); if (d < bestD) { bestD = d; best = a; } }); return best && bestD < .55 ? best : null; }
+function nextPointLabel() {
+  const used = new Set(state.actions.filter(a => a.type === 'point' && a.label).map(a => a.label));
+  const alpha = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'; let n = 0;
+  while (true) { let label = '', k = n; do { label = alpha[k % 26] + label; k = Math.floor(k / 26) - 1; } while (k >= 0); if (!used.has(label)) return label; n++; }
+}
 function showLabelEditor(world, existing) {
   const p = worldToScreen(world), input = document.createElement('input'); input.className = 'point-label-input'; input.value = existing && existing.label ? existing.label : ''; input.style.left = Math.round(p.x + 8) + 'px'; input.style.top = Math.round(p.y - 24) + 'px'; input.setAttribute('aria-label', 'Point label'); let done = false;
   const finish = () => { if (done) return; done = true; input.remove(); const label = input.value.trim(); if (existing) { existing.label = label; render(); } else commit({ type: 'point', at: world, color: state.color, label }); };
@@ -64,7 +69,7 @@ canvas.addEventListener('pointerdown', e => {
     const c = state.construction; let point; if (c.mode === 'axis') { if (Math.abs(rawWorld.x) > .35) { showToast('Choose P directly on the line x = 0.'); return; } point = { x: 0, y: state.snapStep ? Math.round(rawWorld.y / state.snapStep) * state.snapStep : rawWorld.y }; } else { point = closestPointOnSegment(rawWorld, c.line.from, c.line.to); if (pointDistance(rawWorld, point) > .38) { showToast('Choose P directly on the selected reference line.'); return; } }
     c.point = point; c.step = 'first-circle'; commit({ type: 'point', at: c.point, color: '#bf622b', label: 'P' }); state.compassAnchor = null; setTool('compass'); updateConstructionPanel(); showToast('P is set. Plant the compass needle on P.'); return;
   }
-  if (state.tool === 'point') { commit({ type: 'point', at: w, color: state.color, label: `(${pretty(w.x)}, ${pretty(w.y)})` }); return; }
+  if (state.tool === 'point') { commit({ type: 'point', at: w, color: state.color, label: nextPointLabel() }); return; }
   if (state.tool === 'hand' || e.shiftKey || e.button === 1) { state.drawing = { type: 'pan', from: s, origin: { ...state.origin } }; canvas.style.cursor = 'grabbing'; return; }
   if (state.tool === 'compass') {
     if (!state.compassAnchor) { state.compassAnchor = w; setToolTip('Compass needle planted', 'Press the pencil leg at your chosen radius and sweep — a quick click without sweeping holds the opening in place.', [['Esc', 'lift needle']]); showToast('Needle planted — choose the compass radius'); render(); return; }
