@@ -58,9 +58,31 @@ function drawAction(a, preview = false) {
   ctx.save(); ctx.strokeStyle = a.color; ctx.fillStyle = a.color; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
   if (a.type === 'pencil') { if (a.points.length < 2) { ctx.restore(); return; } ctx.lineWidth = 1.8; ctx.beginPath(); a.points.forEach((p, i) => { const s = worldToScreen(p); i ? ctx.lineTo(s.x, s.y) : ctx.moveTo(s.x, s.y) }); ctx.stroke(); }
   if (a.type === 'point') { const p = worldToScreen(a.at); ctx.beginPath(); ctx.arc(p.x, p.y, 4.1, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#fffefa'; ctx.beginPath(); ctx.arc(p.x, p.y, 1.2, 0, Math.PI * 2); ctx.fill(); if (a.label) { ctx.font = '11px "DM Mono",monospace'; ctx.fillStyle = a.color; ctx.fillText(a.label, p.x + 7, p.y - 7); } }
-  if (a.type === 'ray') {
+  if (a.type === 'dotted') {
     const p1 = worldToScreen(a.from), p2 = worldToScreen(a.to); const dx = p2.x - p1.x, dy = p2.y - p1.y, len = Math.hypot(dx, dy);
     if (len >= 2) { ctx.lineCap = 'butt'; ctx.setLineDash([2, 4]); ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke(); ctx.setLineDash([]); ctx.lineCap = 'round'; }
+  }
+  if (a.type === 'ray') {
+    const p1 = worldToScreen(a.from), p2 = worldToScreen(a.to); const dx = p2.x - p1.x, dy = p2.y - p1.y, len = Math.hypot(dx, dy);
+    if (len >= 2) {
+      const ux = dx / len, uy = dy / len, { width, height } = state.canvasSize;
+      let t = 0;
+      if (ux > 0) t = Math.max(t, (width - p1.x) / ux);
+      if (ux < 0) t = Math.max(t, (-p1.x) / ux);
+      if (uy > 0) t = Math.max(t, (height - p1.y) / uy);
+      if (uy < 0) t = Math.max(t, (-p1.y) / uy);
+      const ex = p1.x + ux * t, ey = p1.y + uy * t;
+      ctx.lineCap = 'butt'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(ex, ey); ctx.stroke();
+      ctx.fillStyle = a.color;
+      const ah = 9, aw = 4;
+      ctx.beginPath(); ctx.moveTo(ex, ey);
+      ctx.lineTo(ex - ux * ah - uy * aw, ey - uy * ah + ux * aw);
+      ctx.lineTo(ex - ux * ah + uy * aw, ey - uy * ah - ux * aw);
+      ctx.closePath(); ctx.fill();
+      ctx.beginPath(); ctx.arc(p1.x, p1.y, 3.6, 0, Math.PI * 2); ctx.fill();
+      ctx.lineCap = 'round';
+    }
   }
   if (SHAPES.includes(a.type)) {
     ctx.lineWidth = 2;

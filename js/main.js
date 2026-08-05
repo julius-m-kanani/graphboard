@@ -9,6 +9,7 @@ import { supabase, getProfile } from './supabase.js';
 import { showAuthView, attachAuthHandlers } from './auth.js';
 import { showDashboard, bindDashboardActions } from './dashboard.js';
 import { serializeState, deserializeState } from './serialize.js';
+import { recordVideo } from './recorder.js';
 
 window.__serializeState = () => serializeState(state);
 
@@ -43,6 +44,7 @@ document.getElementById('open-session-button')?.addEventListener('click', () => 
   };
   input.click();
 });
+document.getElementById('record-video-button')?.addEventListener('click', recordVideo);
 
 function withTimeout(promise, ms) {
   return new Promise((resolve, reject) => {

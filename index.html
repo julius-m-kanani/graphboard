@@ -89,8 +89,11 @@
             <button class="tool" data-tool="line" title="Straight line — click and drag">
               <span class="tool-icon line-icon"></span><span>Line</span><kbd>L</kbd>
             </button>
-            <button class="tool" data-tool="ray" title="Dotted line — drag from one point to another">
-              <span class="tool-icon ray-icon"></span><span>Dotted line</span><kbd>T</kbd>
+            <button class="tool" data-tool="dotted" title="Dotted line — drag from one point to another">
+              <span class="tool-icon dotted-icon"></span><span>Dotted line</span><kbd>Y</kbd>
+            </button>
+            <button class="tool" data-tool="ray" title="Ray — drag from a start point to set its direction">
+              <span class="tool-icon ray-icon"></span><span>Ray</span><kbd>T</kbd>
             </button>
           </div>
           <div class="tool-group geometry-tools">
@@ -193,6 +196,7 @@
               <button id="redo-button" title="Redo (Ctrl/⌘ Shift Z)" disabled>↷ Redo</button>
               <button id="save-session-button" title="Save this session as a file on your device">Save session</button>
               <button id="open-session-button" title="Open a saved session from your device">Open session</button>
+              <button id="record-video-button" title="Record this session as a video on your device">Record video</button>
               <button class="danger-action" id="clear-button">Clear page</button>
             </div>
           </div>
@@ -369,7 +373,7 @@
             </label>
             <label id="modal-field-steps">Auto-check steps (comma-separated)
               <input id="modal-steps" type="text" placeholder="e.g. line, compass" autocomplete="off" />
-              <span class="modal-hint">Available: line, ruler, set-square, ray, point, circle, compass, angle, protractor, pencil, plot, square, rectangle, triangle, right-triangle, parallelogram, rhombus, trapezoid, pentagon, hexagon, octagon, star, ellipse, arrow, double-arrow. Leave blank for no auto-check.</span>
+              <span class="modal-hint">Available: line, ruler, set-square, ray, dotted, point, circle, compass, angle, protractor, pencil, plot, square, rectangle, triangle, right-triangle, parallelogram, rhombus, trapezoid, pentagon, hexagon, octagon, star, ellipse, arrow, double-arrow. Leave blank for no auto-check.</span>
             </label>
           </div>
           <p class="auth-error" id="modal-error"></p>
