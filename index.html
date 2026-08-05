@@ -131,51 +131,24 @@
           </div>
           <div class="tool-group shapes-group">
             <p class="panel-label">SHAPES</p>
-            <button class="tool" data-tool="square" title="Square — drag to size, sides stay equal">
-              <span class="tool-icon square-icon"></span><span>Square</span>
-            </button>
-            <button class="tool" data-tool="rectangle" title="Rectangle — drag to set width and height">
-              <span class="tool-icon rectangle-icon"></span><span>Rectangle</span>
-            </button>
-            <button class="tool" data-tool="triangle" title="Equilateral triangle — drag to size">
-              <span class="tool-icon triangle-icon"></span><span>Triangle</span>
-            </button>
-            <button class="tool" data-tool="right-triangle" title="Right triangle — drag to size">
-              <span class="tool-icon right-triangle-icon"></span><span>Right triangle</span>
-            </button>
-            <button class="tool" data-tool="circle" title="Circle — drag to set the radius">
-              <span class="tool-icon circle-icon"></span><span>Circle</span>
-            </button>
-            <button class="tool" data-tool="ellipse" title="Ellipse — drag to set width and height">
-              <span class="tool-icon ellipse-icon"></span><span>Ellipse</span>
-            </button>
-            <button class="tool" data-tool="parallelogram" title="Parallelogram — drag to size and slant">
-              <span class="tool-icon parallelogram-icon"></span><span>Parallelogram</span>
-            </button>
-            <button class="tool" data-tool="rhombus" title="Rhombus — drag to size a diamond">
-              <span class="tool-icon rhombus-icon"></span><span>Rhombus</span>
-            </button>
-            <button class="tool" data-tool="trapezoid" title="Trapezoid — drag to size">
-              <span class="tool-icon trapezoid-icon"></span><span>Trapezoid</span>
-            </button>
-            <button class="tool" data-tool="pentagon" title="Pentagon — drag to size">
-              <span class="tool-icon pentagon-icon"></span><span>Pentagon</span>
-            </button>
-            <button class="tool" data-tool="hexagon" title="Hexagon — drag to size">
-              <span class="tool-icon hexagon-icon"></span><span>Hexagon</span>
-            </button>
-            <button class="tool" data-tool="octagon" title="Octagon — drag to size">
-              <span class="tool-icon octagon-icon"></span><span>Octagon</span>
-            </button>
-            <button class="tool" data-tool="star" title="Star — drag to size">
-              <span class="tool-icon star-icon"></span><span>Star</span>
-            </button>
-            <button class="tool" data-tool="arrow" title="Arrow — drag to draw a block arrow">
-              <span class="tool-icon arrow-icon"></span><span>Arrow</span>
-            </button>
-            <button class="tool" data-tool="double-arrow" title="Double arrow — drag to draw a double-headed arrow">
-              <span class="tool-icon double-arrow-icon"></span><span>Double arrow</span>
-            </button>
+            <select id="shape-select" class="shape-select" aria-label="Choose a shape" title="Choose a shape to draw">
+              <option value="" disabled selected>Shapes…</option>
+              <option value="square">Square</option>
+              <option value="rectangle">Rectangle</option>
+              <option value="triangle">Triangle</option>
+              <option value="right-triangle">Right triangle</option>
+              <option value="circle">Circle</option>
+              <option value="ellipse">Ellipse</option>
+              <option value="parallelogram">Parallelogram</option>
+              <option value="rhombus">Rhombus</option>
+              <option value="trapezoid">Trapezoid</option>
+              <option value="pentagon">Pentagon</option>
+              <option value="hexagon">Hexagon</option>
+              <option value="octagon">Octagon</option>
+              <option value="star">Star</option>
+              <option value="arrow">Arrow</option>
+              <option value="double-arrow">Double arrow</option>
+            </select>
           </div>
           <div class="tool-group tool-colors">
             <p class="panel-label">INK</p>

@@ -307,6 +307,7 @@ function toggleBuilderPreview() {
     $('#builder-panel').hidden = true;
     // Make canvas read-only by disabling tools
     $$('.tool').forEach(t => t.classList.add('disabled'));
+    const shapeSel = $('#shape-select'); if (shapeSel) shapeSel.disabled = true;
     // Show exercise badge like student view
     $('#exercise-badge').hidden = false;
     $('#exercise-title').textContent = 'Preview: ' + ($('#doc-title').value || 'Exercise');
@@ -320,6 +321,7 @@ function toggleBuilderPreview() {
     $('#builder-assign').hidden = false;
     $('#builder-panel').hidden = false;
     $$('.tool').forEach(t => t.classList.remove('disabled'));
+    const shapeSel = $('#shape-select'); if (shapeSel) shapeSel.disabled = false;
     $('#exercise-badge').hidden = true;
     $('#submission-bar').hidden = true;
   }

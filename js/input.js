@@ -91,6 +91,7 @@ canvas.addEventListener('pointerup', endDraw); canvas.addEventListener('pointerc
 canvas.addEventListener('wheel', e => { e.preventDefault(); const s = eventPoint(e), anchor = screenToWorld(s); state.scale = clampScale(state.scale * (e.deltaY < 0 ? 1.12 : .89)); state.origin = { x: s.x - anchor.x * state.scale, y: s.y + anchor.y * state.scale }; $('#scale-readout').textContent = `1 unit = ${state.scale < 10 ? state.scale.toFixed(2) : Math.round(state.scale)} px`; render(); }, { passive: false });
 
 $$('.tool').forEach(b => b.addEventListener('click', () => setTool(b.dataset.tool)));
+$('#shape-select')?.addEventListener('change', e => { if (e.target.value) setTool(e.target.value); });
 $('#perpendicular-button').addEventListener('click', beginPerpendicular);
 $('#any-perpendicular-button').addEventListener('click', beginAnyPerpendicular);
 $$('.swatch').forEach(b => b.addEventListener('click', () => { state.color = b.dataset.color; $$('.swatch').forEach(s => s.classList.toggle('active', s === b)); }));
