@@ -1,10 +1,36 @@
-import { $, $$, state, showToast, loadState } from './core.js';
+import { $, $$, state, showToast, loadState, canvas, render } from './core.js';
 import { supabase } from './supabase.js';
 import { fetchTeacherAccessCode, rotateTeacherAccessCode } from './auth.js';
 import { deserializeState } from './serialize.js';
 import { resizeCanvas } from './draw.js';
 import { updateHistory } from './history.js';
+import { renderActionsToVideo } from './recorder.js';
 import { parseSteps, gradeSubmission, STEP_TYPES } from './autocheck.js';
+
+function blobToDataURL(blob) {
+  return new Promise((resolve, reject) => {
+    const fr = new FileReader();
+    fr.onload = () => resolve(fr.result);
+    fr.onerror = () => reject(fr.error);
+    fr.readAsDataURL(blob);
+  });
+}
+
+async function recordSubmissionVideo(serialized) {
+  const saved = deserializeState(serialized);
+  if (!saved?.actions?.length) return null;
+  if (!window.MediaRecorder || !canvas.captureStream) return null;
+  try {
+    const blob = await renderActionsToVideo(saved.actions, { fps: 15, frameMs: 30, perMarkMs: 80, tailMs: 250, leadInMs: 150, bitrate: 1_500_000 });
+    return await blobToDataURL(blob);
+  } catch (err) {
+    console.error('Submission video failed:', err);
+    return null;
+  } finally {
+    loadState(saved);
+    render();
+  }
+}
 
 let currentProfile = null;
 
@@ -41,6 +67,7 @@ function showWorkspace() {
   $('#workspace-view').hidden = false;
   $('#classroom-button').hidden = false;
   $('#back-button').hidden = true;
+  const strip = $('#review-strip'); if (strip) strip.hidden = true;
   resizeCanvas();
   updateHistory();
 }
@@ -52,7 +79,8 @@ async function renderTeacherDashboard() {
   if (error) { showToast('Could not load classes.'); return; }
   const { data: exercises, error: exErr } = await supabase.from('exercises').select('*').order('created_at');
   if (exErr) { showToast('Could not load exercises.'); return; }
-  const selectedClass = $('#teacher-classes').dataset.selected;
+  let selectedClass = $('#teacher-classes').dataset.selected;
+  if (!selectedClass && classes.length === 1) selectedClass = classes[0].id;
 
   const container = $('#teacher-classes');
   container.innerHTML = '';
@@ -72,6 +100,7 @@ async function renderTeacherDashboard() {
   container.dataset.selected = selectedClass || '';
   bindTeacherClassActions();
   renderTeacherExercises(exercises);
+  renderTeacherRoster();
   fetchTeacherAccessCode().then(code => { if (code) $('#teacher-access-code').textContent = code; }).catch(() => {});
 }
 
@@ -165,6 +194,142 @@ function openForReview(submission, exercise) {
   $('#workspace-view').hidden = false;
   resizeCanvas();
   updateHistory();
+  setupReviewStrip(submission);
+}
+
+function setupReviewStrip(submission) {
+  const strip = $('#review-strip');
+  if (!strip) return;
+  strip.hidden = false;
+  strip.innerHTML = '';
+  const label = document.createElement('b');
+  label.textContent = 'Student recording';
+  strip.appendChild(label);
+
+  const replay = document.createElement('button');
+  replay.className = 'text-button';
+  replay.textContent = 'Replay session';
+  replay.addEventListener('click', async () => {
+    if (replay.disabled) return;
+    const saved = typeof submission.actions === 'string' ? JSON.parse(submission.actions || '{}') : (submission.actions || {});
+    if (!saved.actions || !saved.actions.length) { showToast('No drawing in this submission.'); return; }
+    replay.disabled = true;
+    replay.textContent = 'Recording…';
+    try {
+      const blob = await renderActionsToVideo(saved.actions, { fps: 20, frameMs: 35, perMarkMs: 160, tailMs: 500, leadInMs: 250 });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.download = `submission-${submission.id ? String(submission.id).slice(0, 8) : 'review'}-session.webm`;
+      a.href = url; a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 4000);
+      showToast('Recording ready — check your downloads');
+    } catch (err) {
+      showToast('Could not record: ' + err.message);
+    } finally {
+      replay.disabled = false;
+      replay.textContent = 'Replay session';
+    }
+  });
+  strip.appendChild(replay);
+
+  if (submission.video) {
+    const link = document.createElement('a');
+    link.className = 'text-button';
+    link.href = submission.video;
+    link.download = `submission-${String(submission.id).slice(0, 8)}-recording.webm`;
+    link.textContent = 'Download recorded video';
+    strip.appendChild(link);
+    const vid = document.createElement('video');
+    vid.controls = true;
+    vid.src = submission.video;
+    strip.appendChild(vid);
+  }
+}
+
+// ---------- Class roster ----------
+
+async function renderTeacherRoster() {
+  const heading = $('#roster-heading');
+  const container = $('#teacher-roster');
+  if (!heading || !container) return;
+  heading.hidden = true;
+  container.innerHTML = '';
+  heading.querySelector('h1').textContent = 'Students';
+  const selectedClass = $('#teacher-classes').dataset.selected;
+  if (!selectedClass) return;
+
+  const { data: members, error } = await supabase.from('class_members')
+    .select('*, profiles(full_name, email)')
+    .eq('class_id', selectedClass);
+  if (error) {
+    container.innerHTML = '<p class="dash-empty">Could not load students.</p>';
+    return;
+  }
+  if (!members || !members.length) {
+    container.innerHTML = '<p class="dash-empty">No students have joined this class with the join code yet.</p>';
+    return;
+  }
+
+  const { data: exercises } = await supabase.from('exercises').select('id, title').eq('class_id', selectedClass);
+  const exIds = (exercises || []).map(e => e.id);
+  const { data: subs } = exIds.length
+    ? await supabase.from('submissions').select('*, exercises(title)').in('exercise_id', exIds).order('submitted_at', { ascending: false })
+    : { data: [] };
+
+  heading.hidden = false;
+  members.forEach(m => {
+    const stu = m.profiles || {};
+    const studentSubs = (subs || []).filter(s => s.student_id === m.student_id);
+    const done = studentSubs.filter(s => s.status === 'submitted').length;
+    const card = document.createElement('article');
+    card.className = 'dash-card';
+    card.innerHTML = `
+      <div class="dash-card-main">
+        <h3>${escapeHtml(stu.full_name || 'Student')}</h3>
+        <p>${escapeHtml(stu.email || '')}${studentSubs.length ? ' · ' + done + '/' + studentSubs.length + ' submitted' : ' · no submissions yet'}</p>
+      </div>
+      <button class="text-button" data-student-id="${m.student_id}" data-action="roster-view">View</button>`;
+    container.appendChild(card);
+  });
+  $$('#teacher-roster [data-action="roster-view"]').forEach(btn => btn.addEventListener('click', () => {
+    const m = members.find(x => x.student_id === btn.dataset.studentId);
+    showStudentSubmissions(m ? m.profiles || {} : {}, (subs || []).filter(s => s.student_id === btn.dataset.studentId));
+  }));
+}
+
+function showStudentSubmissions(student, studentSubs) {
+  const heading = $('#roster-heading');
+  const container = $('#teacher-roster');
+  heading.querySelector('h1').textContent = student.full_name || 'Student';
+  container.innerHTML = '';
+  const back = document.createElement('button');
+  back.className = 'text-button';
+  back.textContent = '← All students';
+  back.addEventListener('click', () => renderTeacherDashboard());
+  container.appendChild(back);
+  if (!studentSubs.length) {
+    const p = document.createElement('p');
+    p.className = 'dash-empty';
+    p.textContent = 'This student has no submissions yet.';
+    container.appendChild(p);
+    return;
+  }
+  studentSubs.forEach(s => {
+    const card = document.createElement('article');
+    card.className = 'dash-card';
+    card.innerHTML = `
+      <div class="dash-card-main">
+        <h3>${escapeHtml(s.exercises?.title || 'Exercise')}</h3>
+        <p>${s.status}${s.score != null ? ' · score ' + s.score + '%' : ''}${s.submitted_at ? ' · ' + new Date(s.submitted_at).toLocaleString() : ''}</p>
+      </div>
+      <button class="text-button" data-sub-id="${s.id}" data-action="roster-review">Review</button>`;
+    container.appendChild(card);
+  });
+  $$('#teacher-roster [data-action="roster-review"]').forEach(btn => btn.addEventListener('click', async () => {
+    const s = studentSubs.find(x => x.id === btn.dataset.subId);
+    const { data: exercise } = await supabase.from('exercises').select('*').eq('id', s.exercise_id).single();
+    if (exercise) { showToast('Opening student work in the workspace…'); openForReview(s, exercise); }
+  }));
 }
 
 function generateJoinCode() {
@@ -228,9 +393,10 @@ async function submitModal() {
   const name = $('#modal-class-name').value.trim();
   if (!name) { $('#modal-error').textContent = 'Enter a class name.'; return; }
   const joinCode = generateJoinCode();
-  const { error } = await supabase.from('classes').insert({ name, join_code: joinCode, teacher_id: currentProfile.id });
+  const { data, error } = await supabase.from('classes').insert({ name, join_code: joinCode, teacher_id: currentProfile.id }).select('id').single();
   if (error) { $('#modal-error').textContent = error.message; return; }
   closeModal();
+  $('#teacher-classes').dataset.selected = data.id;
   showToast('Class created. Join code: ' + joinCode);
   await renderTeacherDashboard();
 }
@@ -242,8 +408,13 @@ let builderState = {
 };
 
 function createExercise() {
-  const selectedClass = $('#teacher-classes').dataset.selected;
-  if (!selectedClass) { showToast('Select a class first.'); return; }
+  let selectedClass = $('#teacher-classes').dataset.selected;
+  if (!selectedClass) {
+    const btn = document.querySelector('#teacher-classes [data-action="copy-code"]');
+    if (!btn) { showToast('Create a class first.'); return; }
+    selectedClass = btn.dataset.classId;
+    $('#teacher-classes').dataset.selected = selectedClass;
+  }
   openExerciseBuilder(selectedClass);
 }
 
@@ -308,6 +479,7 @@ function toggleBuilderPreview() {
     // Make canvas read-only by disabling tools
     $$('.tool').forEach(t => t.classList.add('disabled'));
     const shapeSel = $('#shape-select'); if (shapeSel) shapeSel.disabled = true;
+    const shape3dSel = $('#shape3d-select'); if (shape3dSel) shape3dSel.disabled = true;
     // Show exercise badge like student view
     $('#exercise-badge').hidden = false;
     $('#exercise-title').textContent = 'Preview: ' + ($('#doc-title').value || 'Exercise');
@@ -322,6 +494,7 @@ function toggleBuilderPreview() {
     $('#builder-panel').hidden = false;
     $$('.tool').forEach(t => t.classList.remove('disabled'));
     const shapeSel = $('#shape-select'); if (shapeSel) shapeSel.disabled = false;
+    const shape3dSel = $('#shape3d-select'); if (shape3dSel) shape3dSel.disabled = false;
     $('#exercise-badge').hidden = true;
     $('#submission-bar').hidden = true;
   }
@@ -339,6 +512,8 @@ function extractSteps() {
   const stepTypeMap = {
     'line': 'line',
     'ruler': 'ruler',
+    'ray': 'ray',
+    'dotted': 'dotted',
     'set45': 'set-square',
     'set60': 'set-square',
     'point': 'point',
@@ -348,7 +523,29 @@ function extractSteps() {
     'pencil': 'pencil',
     'plot': 'plot',
     'dividers': 'compass', // dividers count as compass
-    'label': 'point' // labeling a point
+    'label': 'point', // labeling a point
+    'square': 'square',
+    'rectangle': 'rectangle',
+    'triangle': 'triangle',
+    'right-triangle': 'right-triangle',
+    'parallelogram': 'parallelogram',
+    'rhombus': 'rhombus',
+    'trapezoid': 'trapezoid',
+    'pentagon': 'pentagon',
+    'hexagon': 'hexagon',
+    'octagon': 'octagon',
+    'star': 'star',
+    'ellipse': 'ellipse',
+    'arrow': 'arrow',
+    'double-arrow': 'double-arrow',
+    'cube': 'cube',
+    'cuboid': 'cuboid',
+    'triangular-prism': 'triangular-prism',
+    'square-pyramid': 'square-pyramid',
+    'tetrahedron': 'tetrahedron',
+    'cone': 'cone',
+    'cylinder': 'cylinder',
+    'sphere': 'sphere'
   };
   
   builderState.extractedSteps = [];
@@ -632,6 +829,17 @@ export async function saveWork(submit = false) {
   const exercise = window.__activeExercise;
   if (!exercise) return;
   const serialized = serializeCurrentState();
+  let video = null;
+  if (submit) {
+    const btn = $('#submit-work-button');
+    if (btn) btn.disabled = true;
+    try {
+      showToast('Recording your work for submission…');
+      video = await recordSubmissionVideo(serialized);
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  }
   const graded = submit ? gradeSubmission(exercise, serialized) : null;
   const payload = {
     exercise_id: exercise.id,
@@ -643,16 +851,29 @@ export async function saveWork(submit = false) {
     submitted_at: submit ? new Date().toISOString() : null,
     updated_at: new Date().toISOString(),
   };
+  if (submit) payload.video = video;
   const existing = window.__activeSubmission;
+  let videoStored = false;
   if (existing) {
-    const { error } = await supabase.from('submissions').update(payload).eq('id', existing.id);
+    let { error } = await supabase.from('submissions').update(payload).eq('id', existing.id);
+    if (error && submit && payload.video) {
+      delete payload.video;
+      ({ error } = await supabase.from('submissions').update(payload).eq('id', existing.id));
+    } else { videoStored = !!payload.video && !error; }
     if (error) { showToast(error.message); return; }
   } else {
-    const { data, error } = await supabase.from('submissions').insert(payload).select('id').single();
+    let { data, error } = await supabase.from('submissions').insert(payload).select('id').single();
+    if (error && submit && payload.video) {
+      delete payload.video;
+      ({ data, error } = await supabase.from('submissions').insert(payload).select('id').single());
+    } else { videoStored = !!payload.video && !error; }
     if (error) { showToast(error.message); return; }
     window.__activeSubmission = { id: data.id };
   }
-  showToast(submit
+  if (submit && videoStored) showToast(submit
+    ? (graded ? `Submitted! Score: ${graded.score}% — recording saved.` : 'Submitted with recording! Your teacher can now see your work.')
+    : 'Work saved.');
+  else showToast(submit
     ? (graded ? `Submitted! Score: ${graded.score}%` : 'Submitted! Your teacher can now see your work.')
     : 'Work saved.');
   if (submit) $('#submission-status').textContent = graded ? `Submitted. Score: ${graded.score}% — ${graded.feedback}` : 'Submitted.';
@@ -698,6 +919,7 @@ export function bindDashboardActions(onAuthSuccess) {
   $('#save-work-button').addEventListener('click', () => saveWork(false));
   $('#submit-work-button').addEventListener('click', () => saveWork(true));
   $('#back-button').addEventListener('click', () => {
+    const strip = $('#review-strip'); if (strip) strip.hidden = true;
     if (window.__activeExercise || window.__activeSubmission) {
       window.__activeExercise = null;
       window.__activeSubmission = null;

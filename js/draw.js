@@ -1,4 +1,4 @@
-import { canvas, paperWrap, ctx, state, screenToWorld, worldToScreen, pretty, pointDistance, render, registerRender, SHAPES, shapeVertices, circleCenterRadius } from './core.js';
+import { canvas, paperWrap, ctx, state, screenToWorld, worldToScreen, pretty, pointDistance, render, registerRender, SHAPES, SHAPES3D, shapeVertices, circleCenterRadius, solidGeometry } from './core.js';
 
 function minorGridStep() {
   const candidates = [0.05, 0.1, 0.125, 0.2, 0.25, 0.5, 1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000];
@@ -84,10 +84,11 @@ function drawAction(a, preview = false) {
       ctx.lineCap = 'round';
     }
   }
-  if (SHAPES.includes(a.type)) {
+  if (SHAPES.includes(a.type) || SHAPES3D.includes(a.type)) {
     ctx.lineWidth = 2;
     if (a.type === 'circle') { const { cx, cy, rx } = circleCenterRadius('circle', a.from, a.to); const p = worldToScreen({ x: cx, y: cy }); ctx.beginPath(); ctx.arc(p.x, p.y, rx * state.scale, 0, Math.PI * 2); ctx.stroke(); }
     else if (a.type === 'ellipse') { const { cx, cy, rx, ry } = circleCenterRadius('ellipse', a.from, a.to); const p = worldToScreen({ x: cx, y: cy }); ctx.beginPath(); ctx.ellipse(p.x, p.y, rx * state.scale, ry * state.scale, 0, 0, Math.PI * 2); ctx.stroke(); }
+    else if (SHAPES3D.includes(a.type)) { drawSolidWire(a); }
     else { const pts = shapeVertices(a.type, a.from, a.to).map(worldToScreen); if (pts.length) { ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y); for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y); ctx.closePath(); ctx.stroke(); } }
   }
   if (a.type === 'line' || a.type === 'ruler' || a.type === 'set-square') { const p1 = worldToScreen(a.from), p2 = worldToScreen(a.to); ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke(); if (a.type === 'ruler' && preview) drawRuler(p1, p2); if (a.type === 'set-square' && preview) drawSetSquare(p1, p2, a.square); }
@@ -96,6 +97,16 @@ function drawAction(a, preview = false) {
   if (a.type === 'angle') { const c = worldToScreen(a.center), e = worldToScreen(a.end), r = Math.min(1.25 * state.scale, pointDistance(c, e) * .65); const angle = Math.atan2(c.y - e.y, e.x - c.x); ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(c.x, c.y); ctx.lineTo(e.x, e.y); ctx.stroke(); ctx.lineWidth = 1.3; ctx.beginPath(); ctx.arc(c.x, c.y, r, 0, angle, true); ctx.stroke(); ctx.font = '11px "DM Mono",monospace'; ctx.fillStyle = a.color; ctx.fillText(`${Math.round((angle * 180 / Math.PI + 360) % 360)}°`, c.x + r + 5, c.y - 5); }
   if (a.type === 'plot') drawPlot(a);
   ctx.restore();
+}
+function drawSolidWire(a) {
+  const g = solidGeometry(a.type, a.from, a.to);
+  for (const e of g.edges) {
+    const p1 = worldToScreen(g.pts[e.a]), p2 = worldToScreen(g.pts[e.b]);
+    ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y);
+    if (e.hidden) { ctx.setLineDash([2, 4]); ctx.globalAlpha = .5; } else { ctx.setLineDash([]); ctx.globalAlpha = 1; }
+    ctx.stroke();
+  }
+  ctx.setLineDash([]); ctx.globalAlpha = 1;
 }
 function drawRuler(p1, p2) {
   const dx = p2.x - p1.x, dy = p2.y - p1.y, len = Math.hypot(dx, dy); if (len < 2) return; ctx.save(); ctx.translate(p1.x, p1.y); ctx.rotate(Math.atan2(dy, dx)); ctx.fillStyle = '#e7e8d1c9'; ctx.strokeStyle = '#9b9f7c'; ctx.lineWidth = 1; ctx.fillRect(0, -15, len, 30); ctx.strokeRect(0, -15, len, 30); ctx.fillStyle = '#6f765a'; ctx.font = '8px "DM Mono",monospace'; for (let x = 0; x < len; x += state.scale / 5) { const major = Math.round(x / (state.scale / 5)) % 5 === 0; ctx.fillRect(x, -15, 1, major ? 9 : 5); ctx.fillRect(x, major ? 6 : 10, 1, major ? 9 : 5); if (major && x > 5) ctx.fillText(String(Math.round(x / state.scale)), x + 2, -7) } ctx.textAlign = 'center'; ctx.fillText(`${pretty(len / state.scale)} units`, len / 2, 4); ctx.restore();

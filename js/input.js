@@ -1,22 +1,22 @@
-import { $, $$, canvas, paperWrap, state, screenToWorld, worldToScreen, snap, pretty, pointDistance, eventPoint, polylineDistance, segmentDistance, closestPointOnSegment, showToast, setTool, setToolTip, canvasCursor, toolCopy, updateReadout, render, clampScale, SHAPES, shapeDistance } from './core.js';
+import { $, $$, canvas, paperWrap, state, screenToWorld, worldToScreen, snap, pretty, pointDistance, eventPoint, polylineDistance, segmentDistance, closestPointOnSegment, showToast, setTool, setToolTip, canvasCursor, toolCopy, updateReadout, render, clampScale, ALL_SHAPES, shapeDistance } from './core.js';
 import { commit, undo, redo, updateHistory } from './history.js';
 import { beginPerpendicular, beginAnyPerpendicular, findReferenceLine, setConstructionLine, constrainSetSquare, updateConstructionPanel } from './construction.js';
 
 function eraseNear(w) {
   let best = -1, dist = Infinity;
-  state.actions.forEach((a, i) => { let d = Infinity; if (a.type === 'point') d = pointDistance(a.at, w); else if (a.type === 'circle') d = Math.abs(pointDistance(a.center, w) - a.radius); else if (a.type === 'pencil') d = Math.min(...a.points.map(p => pointDistance(p, w))); else if (a.type === 'compass') d = polylineDistance(w, a.points); else if (a.type === 'line' || a.type === 'ruler' || a.type === 'set-square' || a.type === 'ray' || a.type === 'dotted') d = segmentDistance(w, a.from, a.to); else if (SHAPES.includes(a.type)) d = shapeDistance(w, a); else if (a.type === 'angle') d = Math.min(pointDistance(w, a.center), segmentDistance(w, a.center, a.end)); if (d < dist) { dist = d; best = i; } });
+  state.actions.forEach((a, i) => { let d = Infinity; if (a.type === 'point') d = pointDistance(a.at, w); else if (a.type === 'circle') d = Math.abs(pointDistance(a.center, w) - a.radius); else if (a.type === 'pencil') d = Math.min(...a.points.map(p => pointDistance(p, w))); else if (a.type === 'compass') d = polylineDistance(w, a.points); else if (a.type === 'line' || a.type === 'ruler' || a.type === 'set-square' || a.type === 'ray' || a.type === 'dotted') d = segmentDistance(w, a.from, a.to); else if (ALL_SHAPES.includes(a.type)) d = shapeDistance(w, a); else if (a.type === 'angle') d = Math.min(pointDistance(w, a.center), segmentDistance(w, a.center, a.end)); if (d < dist) { dist = d; best = i; } });
   if (best >= 0 && dist < .55) { state.redo = []; state.actions.splice(best, 1); updateHistory(); render(); showToast('Mark erased'); } else showToast('No mark close enough to erase');
 }
 function pickAction(w) {
   let best = -1, bestD = Infinity;
-  state.actions.forEach((a, i) => { let d = Infinity; if (a.type === 'point') d = pointDistance(a.at, w); else if (a.type === 'circle') d = Math.min(pointDistance(a.center, w), Math.abs(pointDistance(a.center, w) - a.radius)); else if (a.type === 'pencil') d = Math.min(...a.points.map(p => pointDistance(p, w))); else if (a.type === 'compass') d = polylineDistance(w, a.points); else if (a.type === 'line' || a.type === 'ruler' || a.type === 'set-square' || a.type === 'ray' || a.type === 'dotted') d = segmentDistance(w, a.from, a.to); else if (SHAPES.includes(a.type)) d = shapeDistance(w, a); else if (a.type === 'angle') d = Math.min(pointDistance(w, a.center), segmentDistance(w, a.center, a.end)); if (d < bestD) { bestD = d; best = i; } }); return best >= 0 && bestD < .55 ? state.actions[best] : null;
+  state.actions.forEach((a, i) => { let d = Infinity; if (a.type === 'point') d = pointDistance(a.at, w); else if (a.type === 'circle') d = Math.min(pointDistance(a.center, w), Math.abs(pointDistance(a.center, w) - a.radius)); else if (a.type === 'pencil') d = Math.min(...a.points.map(p => pointDistance(p, w))); else if (a.type === 'compass') d = polylineDistance(w, a.points); else if (a.type === 'line' || a.type === 'ruler' || a.type === 'set-square' || a.type === 'ray' || a.type === 'dotted') d = segmentDistance(w, a.from, a.to); else if (ALL_SHAPES.includes(a.type)) d = shapeDistance(w, a); else if (a.type === 'angle') d = Math.min(pointDistance(w, a.center), segmentDistance(w, a.center, a.end)); if (d < bestD) { bestD = d; best = i; } }); return best >= 0 && bestD < .55 ? state.actions[best] : null;
 }
 function applyMove(a, dx, dy) {
   if (a.type === 'point') { a.at.x += dx; a.at.y += dy; if (a.label && a.label[0] === '(') a.label = `(${pretty(a.at.x)}, ${pretty(a.at.y)})`; return; }
   if (a.type === 'circle') { a.center.x += dx; a.center.y += dy; return; }
   if (a.type === 'compass') { a.center.x += dx; a.center.y += dy; a.points.forEach(p => { p.x += dx; p.y += dy }); return; }
   if (a.type === 'pencil') { a.points.forEach(p => { p.x += dx; p.y += dy }); return; }
-  if (a.type === 'line' || a.type === 'ruler' || a.type === 'set-square' || a.type === 'ray' || a.type === 'dotted' || SHAPES.includes(a.type)) { a.from.x += dx; a.from.y += dy; a.to.x += dx; a.to.y += dy; return; }
+  if (a.type === 'line' || a.type === 'ruler' || a.type === 'set-square' || a.type === 'ray' || a.type === 'dotted' || ALL_SHAPES.includes(a.type)) { a.from.x += dx; a.from.y += dy; a.to.x += dx; a.to.y += dy; return; }
   if (a.type === 'angle') { a.center.x += dx; a.center.y += dy; a.end.x += dx; a.end.y += dy; }
 }
 function pickPointNear(w) { let best = null, bestD = Infinity; state.actions.forEach(a => { if (a.type !== 'point') return; const d = pointDistance(a.at, w); if (d < bestD) { bestD = d; best = a; } }); return best && bestD < .55 ? best : null; }
@@ -44,7 +44,7 @@ function endDraw(e) {
   if (!state.drawing) return; const a = state.drawing; state.drawing = null; canvas.style.cursor = canvasCursor();
   if (a.type === 'pan') { render(); return; }
   if (a.type === 'pencil' && a.points.length < 2) { render(); return; }
-  if ((a.type === 'line' || a.type === 'ruler' || a.type === 'set-square' || a.type === 'ray' || a.type === 'dotted' || SHAPES.includes(a.type)) && pointDistance(a.from, a.to) < .1) { render(); return; }
+  if ((a.type === 'line' || a.type === 'ruler' || a.type === 'set-square' || a.type === 'ray' || a.type === 'dotted' || ALL_SHAPES.includes(a.type)) && pointDistance(a.from, a.to) < .1) { render(); return; }
   if (a.type === 'compass' && a.points.length < 2) { state.compassCarryRadius = a.radius; setToolTip('Compass opening held', 'Sweep the pencil leg to draw the arc, or press Esc to move the needle with this span.', [['Esc', 'replant, keeping span'], ['X', 'release opening']]); render(); showToast('Opening held in place — sweep to draw, Esc to move, X to release.'); return; }
   if (a.type === 'angle' && pointDistance(a.center, a.end) < .1) { render(); return; }
   if (a.type === 'compass') { state.compassCarryRadius = a.radius; setToolTip('Compass opening held', 'Move the needle to a new centre to keep this span, or release it.', [['Esc', 'replant, keeping span'], ['X', 'release opening']]); }
@@ -76,7 +76,7 @@ canvas.addEventListener('pointerdown', e => {
     const radius = state.compassCarryRadius || pointDistance(state.compassAnchor, w); if (!state.compassCarryRadius && radius < .22) { state.compassAnchor = w; render(); return; }
     const angle = Math.atan2(w.y - state.compassAnchor.y, w.x - state.compassAnchor.x), pencil = { x: state.compassAnchor.x + radius * Math.cos(angle), y: state.compassAnchor.y + radius * Math.sin(angle) }; state.drawing = { type: 'compass', center: state.compassAnchor, radius, angles: [angle], points: [pencil], color: state.color }; render(); return;
   }
-  const types = { pencil: 'pencil', line: 'line', ray: 'ray', dotted: 'dotted', ruler: 'ruler', set45: 'set-square', set60: 'set-square', protractor: 'angle', square: 'square', rectangle: 'rectangle', triangle: 'triangle', 'right-triangle': 'right-triangle', parallelogram: 'parallelogram', rhombus: 'rhombus', trapezoid: 'trapezoid', pentagon: 'pentagon', hexagon: 'hexagon', octagon: 'octagon', star: 'star', circle: 'circle', ellipse: 'ellipse', arrow: 'arrow', 'double-arrow': 'double-arrow' }; const type = types[state.tool] || 'pencil';
+  const types = { pencil: 'pencil', line: 'line', ray: 'ray', dotted: 'dotted', ruler: 'ruler', set45: 'set-square', set60: 'set-square', protractor: 'angle', square: 'square', rectangle: 'rectangle', triangle: 'triangle', 'right-triangle': 'right-triangle', parallelogram: 'parallelogram', rhombus: 'rhombus', trapezoid: 'trapezoid', pentagon: 'pentagon', hexagon: 'hexagon', octagon: 'octagon', star: 'star', circle: 'circle', ellipse: 'ellipse', arrow: 'arrow', 'double-arrow': 'double-arrow', cube: 'cube', cuboid: 'cuboid', 'triangular-prism': 'triangular-prism', 'square-pyramid': 'square-pyramid', tetrahedron: 'tetrahedron', cone: 'cone', cylinder: 'cylinder', sphere: 'sphere' }; const type = types[state.tool] || 'pencil';
   state.drawing = type === 'pencil' ? { type, points: [w], color: state.color } : type === 'set-square' ? { type, square: state.tool === 'set45' ? '45' : '60', color: state.color, from: w, to: w } : { type, color: state.color, from: w, to: w, center: w, end: w, radius: 0 }; render();
 });
 canvas.addEventListener('pointermove', e => {
@@ -92,6 +92,7 @@ canvas.addEventListener('wheel', e => { e.preventDefault(); const s = eventPoint
 
 $$('.tool').forEach(b => b.addEventListener('click', () => setTool(b.dataset.tool)));
 $('#shape-select')?.addEventListener('change', e => { if (e.target.value) setTool(e.target.value); });
+$('#shape3d-select')?.addEventListener('change', e => { if (e.target.value) setTool(e.target.value); });
 $('#perpendicular-button').addEventListener('click', beginPerpendicular);
 $('#any-perpendicular-button').addEventListener('click', beginAnyPerpendicular);
 $$('.swatch').forEach(b => b.addEventListener('click', () => { state.color = b.dataset.color; $$('.swatch').forEach(s => s.classList.toggle('active', s === b)); }));

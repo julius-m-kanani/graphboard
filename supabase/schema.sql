@@ -51,6 +51,9 @@ create table if not exists public.submissions (
   unique (exercise_id, student_id)
 );
 
+-- The student's recorded session video, stored as a data URL (set on submit).
+alter table public.submissions add column if not exists video text;
+
 -- Settings (key/value store, e.g. the teacher access code)
 create table if not exists public.settings (
   key text primary key,
@@ -146,6 +149,17 @@ alter table public.settings enable row level security;
 -- Profiles: a user can read and update their own profile
 create policy "own profile" on public.profiles
   for all using (auth.uid() = id) with check (auth.uid() = id);
+
+-- Teachers can see the names of the students enrolled in their classes, so the
+-- class roster and submission lists can show who submitted what.
+create policy "teachers read student profiles" on public.profiles
+  for select using (
+    exists (
+      select 1 from public.class_members m
+      join public.classes c on c.id = m.class_id
+      where m.student_id = public.profiles.id and c.teacher_id = auth.uid()
+    )
+  );
 
 -- Classes: teacher owns, students can join by code
 create policy "teachers manage own classes" on public.classes

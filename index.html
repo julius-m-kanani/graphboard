@@ -130,7 +130,7 @@
             </button>
           </div>
           <div class="tool-group shapes-group">
-            <p class="panel-label">SHAPES</p>
+            <p class="panel-label">2D SHAPES</p>
             <select id="shape-select" class="shape-select" aria-label="Choose a shape" title="Choose a shape to draw">
               <option value="" disabled selected>Shapes…</option>
               <option value="square">Square</option>
@@ -148,6 +148,20 @@
               <option value="star">Star</option>
               <option value="arrow">Arrow</option>
               <option value="double-arrow">Double arrow</option>
+            </select>
+          </div>
+          <div class="tool-group shapes-group">
+            <p class="panel-label">3D SHAPES</p>
+            <select id="shape3d-select" class="shape-select" aria-label="Choose a 3D shape" title="Choose a 3D shape to draw">
+              <option value="" disabled selected>3D shapes…</option>
+              <option value="cube">Cube</option>
+              <option value="cuboid">Cuboid</option>
+              <option value="triangular-prism">Triangular prism</option>
+              <option value="square-pyramid">Square pyramid</option>
+              <option value="tetrahedron">Tetrahedron</option>
+              <option value="cone">Cone</option>
+              <option value="cylinder">Cylinder</option>
+              <option value="sphere">Sphere</option>
             </select>
           </div>
           <div class="tool-group tool-colors">
@@ -189,6 +203,7 @@
             <button class="auth-submit slim" id="submit-work-button">Submit</button>
             <span class="submission-status" id="submission-status"></span>
           </div>
+          <div class="review-strip" id="review-strip" hidden aria-label="Student recording review"></div>
         </section>
 
         <aside class="settings-panel">
@@ -308,6 +323,8 @@
           </div>
           <div class="dash-heading" id="exercise-heading" hidden><h1>Exercises</h1><button class="wide-button slim" id="new-exercise-button">+ New exercise</button></div>
           <div id="teacher-exercises" class="dash-cards"></div>
+          <div class="dash-heading" id="roster-heading" hidden><h1>Students</h1></div>
+          <div id="teacher-roster" class="dash-cards"></div>
           <div class="dash-heading" id="submission-heading" hidden><h1>Submissions</h1></div>
           <div id="teacher-submissions" class="dash-cards"></div>
         </div>

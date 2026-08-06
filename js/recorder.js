@@ -33,20 +33,20 @@ function setControls(disabled) {
   paperWrap.style.cursor = disabled ? 'wait' : '';
 }
 
-export async function recordVideo() {
-  if (recording) { showToast('Already recording'); return; }
-  if (!state.actions.length) { showToast('Nothing to record yet'); return; }
-  if (!window.MediaRecorder || !canvas.captureStream) { showToast('Video recording is not supported in this browser'); return; }
-
-  recording = true;
-  setControls(true);
-  showToast('Recording your session…');
-
-  const saved = serializeState(state);
-  const replay = deserializeState(saved);
+// Replay a list of actions onto the canvas while recording it, returning the
+// resulting video blob. The caller is responsible for restoring the canvas
+// state afterwards.
+export async function renderActionsToVideo(actions, opts = {}) {
+  if (!window.MediaRecorder || !canvas.captureStream) throw new Error('Video recording is not supported in this browser');
+  const fps = opts.fps ?? 30;
+  const frameMs = opts.frameMs ?? 45;
+  const perMarkMs = opts.perMarkMs ?? 220;
+  const tailMs = opts.tailMs ?? 900;
+  const leadInMs = opts.leadInMs ?? 400;
+  const bitrate = opts.bitrate ?? 5_000_000;
   const mime = pickMimeType();
-  const stream = canvas.captureStream(30);
-  const recorder = new MediaRecorder(stream, mime ? { mimeType: mime, videoBitsPerSecond: 5_000_000 } : undefined);
+  const stream = canvas.captureStream(fps);
+  const recorder = new MediaRecorder(stream, mime ? { mimeType: mime, videoBitsPerSecond: bitrate } : undefined);
   const chunks = [];
   recorder.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
   const finished = new Promise(resolve => { recorder.onstop = resolve; });
@@ -57,21 +57,45 @@ export async function recordVideo() {
     state.compassAnchor = null; state.compassCarryRadius = null; state.construction = null;
     state.actions = []; state.redo = [];
     render();
-    await sleep(400);
+    await sleep(leadInMs);
 
-    for (const a of replay.actions) {
+    for (const a of actions) {
       const frames = framesFor(a);
-      for (const f of frames) { state.actions.push(f); render(); await sleep(45); }
-      await sleep(220);
+      for (const f of frames) { state.actions.push(f); render(); await sleep(frameMs); }
+      await sleep(perMarkMs);
     }
-    await sleep(900);
+    await sleep(tailMs);
   } finally {
     recorder.stop();
   }
 
   await finished;
 
-  const blob = new Blob(chunks, { type: recorder.mimeType || 'video/webm' });
+  return new Blob(chunks, { type: recorder.mimeType || 'video/webm' });
+}
+
+export async function recordVideo() {
+  if (recording) { showToast('Already recording'); return; }
+  if (!state.actions.length) { showToast('Nothing to record yet'); return; }
+  if (!window.MediaRecorder || !canvas.captureStream) { showToast('Video recording is not supported in this browser'); return; }
+
+  recording = true;
+  setControls(true);
+  showToast('Recording your session…');
+
+  const saved = serializeState(state);
+  let blob;
+  try {
+    blob = await renderActionsToVideo(deserializeState(saved).actions, {});
+  } catch (err) {
+    loadState(deserializeState(saved));
+    render();
+    setControls(false);
+    recording = false;
+    showToast('Could not record: ' + err.message);
+    return;
+  }
+
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.download = `${document.querySelector('.document-name input')?.value.trim() || 'graphboard'}-session.webm`;

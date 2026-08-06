@@ -66,6 +66,10 @@ button { color:inherit; cursor:pointer; }
 .exercise-badge b{font-size:12px;color:#24353d}
 .exercise-badge span{font-size:10px;color:#8a9496}
 .submission-bar[hidden]{display:none}
+.review-strip{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:8px 14px;background:#fbf7ec;border-top:1px solid #e9e0c7;font-size:12px;color:#66757a}
+.review-strip[hidden]{display:none}
+.review-strip b{color:#24353d;font-size:12px}
+.review-strip video{max-height:72px;border-radius:6px;border:1px solid #e9e0c7;background:#fff}
 .teacher-code-card{display:flex;align-items:center;gap:12px;margin:14px 0 4px;padding:12px 14px;background:#fbf7ec;border:1px solid #e9e0c7;border-radius:10px;color:#66757a;font-size:12px}
 .teacher-code-card b{font:700 14px "DM Mono",monospace;color:#355cae;background:#eef2fb;padding:4px 10px;border-radius:6px;letter-spacing:1px}
 .teacher-code-card .wide-button{margin:0 0 0 auto;width:auto}
