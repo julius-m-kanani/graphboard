@@ -57,43 +57,15 @@ create table if not exists public.submissions (
 -- client). Storage RLS governs upload/download (see the storage section below).
 alter table public.submissions add column if not exists video text;
 
--- Settings (key/value store, e.g. the teacher access code)
-create table if not exists public.settings (
-  key text primary key,
-  value text not null,
-  updated_at timestamptz not null default now()
-);
-
--- Teacher access code: auto-generated, rotatable. Only teachers/admins can read
--- it or rotate it to a new random code.
-create or replace function public.rotate_teacher_code()
-returns text
-language plpgsql
-security definer set search_path = public
-as $$
-declare
-  v_code text;
-begin
-  if not public.is_teacher() then
-    raise exception 'Only teachers can rotate the access code';
-  end if;
-  insert into public.settings (key, value)
-  values ('teacher_access_code', upper(substr(md5(random()::text), 1, 8)))
-  on conflict (key) do update
-    set value = excluded.value, updated_at = now()
-  returning value into v_code;
-  return v_code;
-end;
-$$;
-
-create or replace function public.get_teacher_access_code()
-returns text
-language sql
-security definer set search_path = public
-stable
-as $$
-  select value from public.settings where key = 'teacher_access_code';
-$$;
+-- SaaS registration is open: anybody may sign up as a teacher or student —
+-- there is no teacher access code. The signup client passes the chosen role
+-- (and display name) in the auth user metadata, and the auto-create trigger
+-- below whitelists it. The old access-code objects are dropped if present.
+drop policy if exists "teachers read settings" on public.settings;
+drop table if exists public.settings;
+drop function if exists public.rotate_teacher_code();
+drop function if exists public.get_teacher_access_code();
+drop function if exists public.claim_teacher_role(text);
 
 -- is_teacher() reports whether the caller is a teacher or admin. Security
 -- definer so policies and functions can check the role without RLS recursion.
@@ -109,34 +81,11 @@ as $$
   );
 $$;
 
--- Claim the teacher role during signup. Validates the teacher access code
--- server-side and promotes the caller from student to teacher. The client must
--- NOT update profiles.role directly (blocked by the trigger below).
-create or replace function public.claim_teacher_role(p_code text)
-returns void
-language plpgsql
-security definer set search_path = public
-as $$
-declare
-  v_code text;
-begin
-  if auth.uid() is null then
-    raise exception 'Sign in before claiming the teacher role';
-  end if;
-  select value into v_code from public.settings where key = 'teacher_access_code';
-  if v_code is null or p_code is null or upper(trim(p_code)) <> v_code then
-    raise exception 'That teacher access code is not valid';
-  end if;
-  perform set_config('app.teacher_claim', 'true', true);
-  update public.profiles set role = 'teacher' where id = auth.uid();
-end;
-$$;
-
 -- Guard the profiles.role column. The "own profile" RLS policy lets users edit
 -- their own row (name), but without this trigger anyone could promote
--- themselves to teacher/admin with a direct API update. Allowed transitions:
+-- themselves to admin with a direct API update (teacher/student is chosen
+-- once at signup via the trigger below). Allowed transitions:
 --   - admins may change any role (via admin_set_role);
---   - the teacher-signup claim (flag set by claim_teacher_role);
 --   - self-promotion to admin while no admin exists yet (first-admin bootstrap,
 --     mirroring admin_set_role).
 create or replace function public.enforce_profile_role()
@@ -153,11 +102,6 @@ begin
   if public.is_admin() then
     return new;
   end if;
-  if current_setting('app.teacher_claim', true) = 'true'
-     and old.role = 'student' and new.role = 'teacher'
-     and new.id = auth.uid() then
-    return new;
-  end if;
   select count(*) into v_admin_count from public.profiles where role = 'admin';
   if v_admin_count = 0 and new.id = auth.uid() and new.role = 'admin' then
     return new;
@@ -172,12 +116,6 @@ create trigger protect_profile_role
   for each row execute function public.enforce_profile_role();
 
 grant execute on function public.is_teacher() to authenticated;
-grant execute on function public.claim_teacher_role(text) to authenticated;
-
--- Seed an initial teacher access code if the settings table is empty
-insert into public.settings (key, value)
-select 'teacher_access_code', upper(substr(md5(random()::text), 1, 8))
-where not exists (select 1 from public.settings where key = 'teacher_access_code');
 
 -- Admin role helpers -------------------------------------------------------
 -- is_admin() is used by the RLS policies below, so it is security definer and
@@ -197,9 +135,7 @@ $$;
 -- Change a user's role. Security definer (bypasses RLS) but guards the caller:
 --  - an existing admin may change anyone's role;
 --  - if no admin exists yet, any signed-in user may promote *themselves* to
---    admin, which bootstraps the first admin (the teacher access code gates
---    teacher signup; the admin bootstrap should be disabled once the site has
---    an admin).
+--    admin, which bootstraps the first admin.
 create or replace function public.admin_set_role(p_user_id uuid, p_role text)
 returns void
 language plpgsql
@@ -234,7 +170,6 @@ alter table public.classes enable row level security;
 alter table public.class_members enable row level security;
 alter table public.exercises enable row level security;
 alter table public.submissions enable row level security;
-alter table public.settings enable row level security;
 
 -- Profiles: a user can read and update their own profile
 create policy "own profile" on public.profiles
@@ -346,19 +281,6 @@ create policy "teachers read submissions" on public.submissions
     )
   );
 
--- Settings: teachers can read the access code; nobody writes directly
--- (rotation goes through rotate_teacher_code).
-create policy "teachers read settings" on public.settings
-  for select using (exists (select 1 from public.profiles p where p.id = auth.uid() and p.role = 'teacher'));
-
--- The access code is validated server-side by claim_teacher_role() during
--- signup. Authenticated teachers read it for display/rotation; it is no
--- longer exposed to anon. Rotation is authenticated-only and role-checked
--- inside the function.
-revoke execute on function public.get_teacher_access_code() from anon;
-grant execute on function public.rotate_teacher_code() to authenticated;
-grant execute on function public.get_teacher_access_code() to authenticated;
-
 -- Admins can read and manage everything.
 create policy "admin full access profiles" on public.profiles
   for all using (public.is_admin()) with check (public.is_admin());
@@ -375,8 +297,68 @@ create policy "admin full access exercises" on public.exercises
 create policy "admin full access submissions" on public.submissions
   for all using (public.is_admin()) with check (public.is_admin());
 
-create policy "admin full access settings" on public.settings
-  for all using (public.is_admin()) with check (public.is_admin());
+-- Teachers may update only the feedback (plus timestamp) on submissions in
+-- their own classes: the RLS policy below opens UPDATE to them, and this
+-- trigger rejects any change to the student's work, status, score or video.
+-- Students keep full control of their own rows; admins may change anything.
+create or replace function public.enforce_submission_feedback()
+returns trigger
+language plpgsql
+security definer set search_path = public
+as $$
+begin
+  if new.student_id = auth.uid() or public.is_admin() then
+    return new;
+  end if;
+  if new.id is not distinct from old.id
+     and new.exercise_id is not distinct from old.exercise_id
+     and new.student_id is not distinct from old.student_id
+     and new.actions is not distinct from old.actions
+     and new.status is not distinct from old.status
+     and new.score is not distinct from old.score
+     and new.submitted_at is not distinct from old.submitted_at
+     and new.video is not distinct from old.video then
+    return new;
+  end if;
+  raise exception 'You may only edit the feedback on this submission';
+end;
+$$;
+
+drop trigger if exists protect_submission_feedback on public.submissions;
+create trigger protect_submission_feedback
+  before update on public.submissions
+  for each row execute function public.enforce_submission_feedback();
+
+drop policy if exists "teachers update feedback" on public.submissions;
+create policy "teachers update feedback" on public.submissions
+  for update
+  using (
+    exists (
+      select 1 from public.exercises e
+      join public.classes c on c.id = e.class_id
+      where e.id = exercise_id and c.teacher_id = auth.uid()
+    )
+  )
+  with check (
+    exists (
+      select 1 from public.exercises e
+      join public.classes c on c.id = e.class_id
+      where e.id = exercise_id and c.teacher_id = auth.uid()
+    )
+  );
+
+-- First-admin setup: the client shows a one-time "claim site administrator"
+-- banner while no admin exists (the bootstrap rule in admin_set_role allows a
+-- signed-in user to promote themselves only in that state).
+create or replace function public.site_needs_admin()
+returns boolean
+language sql
+security definer set search_path = public
+stable
+as $$
+  select not exists (select 1 from public.profiles where role = 'admin');
+$$;
+grant execute on function public.site_needs_admin() to authenticated;
 
 -- Storage -------------------------------------------------------------------
 -- Submission videos live in a private bucket; RLS on storage.objects governs
@@ -418,15 +400,26 @@ create policy "read class videos" on storage.objects
     )
   );
 
--- Auto-create a profile on signup
+-- Auto-create a profile on signup. The client passes the chosen role and
+-- display name in the auth user metadata; the role is whitelisted here so a
+-- crafted signup can never mint an admin (admins are granted only via
+-- admin_set_role).
 create or replace function public.handle_new_user()
 returns trigger
 language plpgsql
 security definer set search_path = public
 as $$
+declare
+  v_role text;
+  v_name text;
 begin
+  v_role := coalesce(nullif(new.raw_user_meta_data->>'role', ''), 'student');
+  if v_role not in ('teacher', 'student') then
+    v_role := 'student';
+  end if;
+  v_name := coalesce(nullif(new.raw_user_meta_data->>'full_name', ''), '');
   insert into public.profiles (id, email, full_name, role)
-  values (new.id, new.email, '', 'student')
+  values (new.id, new.email, v_name, v_role)
   on conflict (id) do nothing;
   return new;
 end;

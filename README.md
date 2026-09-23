@@ -66,6 +66,16 @@ One deployable app, split internally into focused ES modules (`js/`). Each modul
 
 `index.html` is a thin shell that loads `styles.css` and `<script type="module" src="js/main.js">`.
 
+## Classroom setup (one time)
+
+The classroom features need the database before first use. Registration is
+open: anybody can sign up as a teacher or student and start right away.
+
+1. In the Supabase dashboard open the SQL editor and run `supabase/schema.sql` (it is idempotent — safe to re-run after updates).
+2. Sign up on the site, choosing **I'm a teacher** or **I'm a student**. (Students enter their class join code at registration; teachers need none.)
+3. While no administrator exists, a signed-in user gets a one-time **Claim site administrator** banner — the admin manages users and roles.
+4. As a teacher: create a class, copy its **join code** from the class card, and hand it to your students.
+
 ## Deploying
 
 ### GitHub Pages (recommended)

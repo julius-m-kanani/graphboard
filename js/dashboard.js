@@ -1,6 +1,5 @@
 import { $, $$, state, showToast, loadState, canvas, render } from './core.js';
-import { supabase } from './supabase.js';
-import { fetchTeacherAccessCode, rotateTeacherAccessCode } from './auth.js';
+import { supabase, getProfile } from './supabase.js';
 import { deserializeState } from './serialize.js';
 import { resizeCanvas } from './draw.js';
 import { updateHistory } from './history.js';
@@ -64,6 +63,39 @@ export async function showDashboard(profile) {
     $('#dash-admin').hidden = true;
     await renderStudentDashboard();
   }
+  maybeShowAdminSetup();
+}
+
+// One-time site setup: while no administrator exists, offer the signed-in
+// user a banner to claim the role (allowed server-side only in that state).
+async function maybeShowAdminSetup() {
+  if (!currentProfile || currentProfile.role === 'admin') return;
+  if (document.getElementById('admin-setup-banner')) return;
+  let needs = false;
+  try {
+    const { data, error } = await supabase.rpc('site_needs_admin');
+    if (error) return;
+    needs = !!data;
+  } catch { return; }
+  if (!needs) return;
+  const banner = document.createElement('div');
+  banner.id = 'admin-setup-banner';
+  banner.className = 'teacher-code-card';
+  const label = document.createElement('span');
+  label.textContent = 'No site administrator exists yet. Claim the role to manage users and classes.';
+  banner.appendChild(label);
+  const btn = document.createElement('button');
+  btn.className = 'wide-button slim';
+  btn.textContent = 'Claim site administrator';
+  btn.addEventListener('click', async () => {
+    btn.disabled = true;
+    const { error } = await supabase.rpc('admin_set_role', { p_user_id: currentProfile.id, p_role: 'admin' });
+    if (error) { showToast(error.message); btn.disabled = false; return; }
+    const profile = await getProfile();
+    if (profile) { showToast('You are now the site administrator.'); showDashboard(profile); }
+  });
+  banner.appendChild(btn);
+  document.querySelector('.dash-body')?.prepend(banner);
 }
 
 export function showWorkspace() {
@@ -120,14 +152,14 @@ async function renderTeacherDashboard() {
         <p>${count} exercise${count === 1 ? '' : 's'}</p>
       </div>
       <span class="join-code">${c.join_code}</span>
-      <button class="icon-button small" data-class-id="${c.id}" data-action="copy-code" title="Copy join code">⧉</button>`;
+      <button class="icon-button small" data-class-id="${c.id}" data-action="copy-code" title="Copy join code">⧉</button>
+      <button class="icon-button small danger-action" data-class-id="${c.id}" data-action="delete-class" title="Delete class and everything in it"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2m3 0-1 13a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1L6 7"/></svg></button>`;
     container.appendChild(card);
   });
   container.dataset.selected = selectedClass || '';
   bindTeacherClassActions();
   renderTeacherExercises(exercises);
   renderTeacherRoster();
-  fetchTeacherAccessCode().then(code => { if (code) $('#teacher-access-code').textContent = code; }).catch(() => {});
 }
 
 function bindTeacherClassActions() {
@@ -138,6 +170,17 @@ function bindTeacherClassActions() {
       await navigator.clipboard.writeText(code);
       showToast('Join code copied: ' + code);
     } catch { showToast('Join code: ' + code); }
+  }));
+  $$('#teacher-classes [data-action="delete-class"]').forEach(btn => btn.addEventListener('click', async e => {
+    e.stopPropagation();
+    const id = btn.dataset.classId;
+    const name = btn.closest('.dash-card')?.querySelector('h3')?.textContent || 'this class';
+    if (!confirm(`Delete "${name}"? Its exercises, submissions and roster entries will be permanently removed.`)) return;
+    const { error } = await supabase.from('classes').delete().eq('id', id);
+    if (error) { showToast(error.message); return; }
+    if ($('#teacher-classes').dataset.selected === id) $('#teacher-classes').dataset.selected = '';
+    showToast('Class deleted.');
+    await renderTeacherDashboard();
   }));
   $$('#teacher-classes .dash-card').forEach(card => {
     card.addEventListener('click', async () => {
@@ -194,7 +237,7 @@ async function viewExercise(exerciseId) {
     card.innerHTML = `
       <div class="dash-card-main">
         <h3>${escapeHtml(name)}</h3>
-        <p>${s.status}${s.score != null ? ' · score ' + s.score + '%' : ''}${s.submitted_at ? ' · ' + new Date(s.submitted_at).toLocaleString() : ''}</p>
+        <p>${s.status}${s.score != null ? ' · score ' + s.score + '%' : ''}${s.feedback ? ' · feedback given' : ''}${s.submitted_at ? ' · ' + new Date(s.submitted_at).toLocaleString() : ''}</p>
       </div>
       <button class="text-button" data-sub-id="${s.id}" data-action="review">Review</button>`;
     container.appendChild(card);
@@ -269,6 +312,35 @@ async function setupReviewStrip(submission) {
     }
   });
   strip.appendChild(replay);
+
+  // Teacher feedback: written to the submission row (teachers may only edit
+  // the feedback column — enforced database-side) and visible to the student
+  // when they next open the exercise.
+  const fbInput = document.createElement('textarea');
+  fbInput.className = 'review-feedback-input';
+  fbInput.rows = 2;
+  fbInput.placeholder = 'Write feedback for the student… (keeps any auto-check note already here)';
+  fbInput.value = submission.feedback || '';
+  fbInput.setAttribute('aria-label', 'Feedback for the student');
+  strip.appendChild(fbInput);
+  const fbSave = document.createElement('button');
+  fbSave.className = 'text-button';
+  fbSave.textContent = 'Save feedback';
+  fbSave.addEventListener('click', async () => {
+    if (fbSave.disabled) return;
+    fbSave.disabled = true;
+    try {
+      const { error } = await supabase.from('submissions')
+        .update({ feedback: fbInput.value, updated_at: new Date().toISOString() })
+        .eq('id', submission.id);
+      if (error) { showToast(error.message); return; }
+      submission.feedback = fbInput.value;
+      showToast(fbInput.value ? 'Feedback saved — the student can see it.' : 'Feedback cleared.');
+    } finally {
+      fbSave.disabled = false;
+    }
+  });
+  strip.appendChild(fbSave);
 
   if (submission.video) {
     let url = submission.video;
@@ -365,7 +437,7 @@ function showStudentSubmissions(student, studentSubs) {
     card.innerHTML = `
       <div class="dash-card-main">
         <h3>${escapeHtml(s.exercises?.title || 'Exercise')}</h3>
-        <p>${s.status}${s.score != null ? ' · score ' + s.score + '%' : ''}${s.submitted_at ? ' · ' + new Date(s.submitted_at).toLocaleString() : ''}</p>
+        <p>${s.status}${s.score != null ? ' · score ' + s.score + '%' : ''}${s.feedback ? ' · feedback given' : ''}${s.submitted_at ? ' · ' + new Date(s.submitted_at).toLocaleString() : ''}</p>
       </div>
       <button class="text-button" data-sub-id="${s.id}" data-action="roster-review">Review</button>`;
     container.appendChild(card);
@@ -708,6 +780,7 @@ async function submitAssignModal() {
   
   // Convert builder steps to exercise steps format
   const steps = builderState.extractedSteps.map(s => ({ type: s.type, count: s.count, label: s.label }));
+  if (!steps.length && !confirm('No auto-check steps were extracted — this exercise will have no automatic score. Assign anyway?')) return;
   
   const { error } = await supabase.from('exercises').insert({ 
     class_id: classId, 
@@ -736,7 +809,6 @@ async function renderAdminDashboard() {
   renderAdminUsers(users.data);
   renderAdminClasses(classes.data, exercises.data);
   renderAdminSubmissions(submissions.data, exercises.data);
-  fetchTeacherAccessCode().then(code => { if (code) $('#admin-access-code').textContent = code; }).catch(() => {});
 }
 
 function renderAdminUsers(users) {
@@ -863,6 +935,11 @@ async function openExercise(exerciseId) {
     $('#submission-status').textContent = '';
     $('#submit-work-button').textContent = 'Submit';
   }
+  if (submission?.feedback) {
+    const status = $('#submission-status');
+    status.textContent += `${status.textContent ? ' ' : ''}Teacher feedback: ${submission.feedback}`;
+    status.title = submission.feedback;
+  }
   window.__activeExercise = exercise;
   window.__activeSubmission = submission;
   window.__builderReadOnly = false;
@@ -973,16 +1050,6 @@ export function bindDashboardActions(onAuthSuccess) {
   $('#modal-close').addEventListener('click', closeModal);
   $('#modal-backdrop').addEventListener('click', e => { if (e.target === e.currentTarget) closeModal(); });
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#modal-backdrop').hidden) closeModal(); else if (e.key === 'Escape' && !$('#builder-panel').hidden) exitBuilder(); });
-  $('#rotate-code-button').addEventListener('click', async () => {
-    const code = await rotateTeacherAccessCode();
-    $('#teacher-access-code').textContent = code || '——';
-    showToast('Teacher access code rotated.');
-  });
-  $('#admin-rotate-code-button').addEventListener('click', async () => {
-    const code = await rotateTeacherAccessCode();
-    $('#admin-access-code').textContent = code || '——';
-    showToast('Teacher access code rotated.');
-  });
   $('#save-work-button').addEventListener('click', () => saveWork(false));
   $('#submit-work-button').addEventListener('click', () => saveWork(true));
   $('#back-button').addEventListener('click', () => {

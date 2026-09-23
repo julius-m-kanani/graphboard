@@ -14,16 +14,13 @@ export async function showAuthView() {
 
 function resetAuthForms() {
   const student = $('input[name="role"][value="student"]');
-  if (student) {
-    student.checked = true;
-    const teacher = $('#signup-teacher-code').closest('label');
-    teacher.hidden = true;
-  }
+  if (student) student.checked = true;
+  const codeField = document.getElementById('signup-code-field');
+  if (codeField) codeField.hidden = false;
   $('#signup-name').value = '';
   $('#signup-email').value = '';
   $('#signup-password').value = '';
   $('#signup-code').value = '';
-  $('#signup-teacher-code').value = '';
   $('#signup-error').textContent = '';
   $('#login-error').textContent = '';
 }
@@ -47,10 +44,10 @@ function setupAuthForms() {
       if (signupError) signupError.textContent = '';
     });
   }
-  const roleInputs = document.querySelectorAll('input[name="role"]');
-  roleInputs.forEach(input => input.addEventListener('change', () => {
-    const teacher = document.getElementById('signup-teacher-code')?.closest('label');
-    if (teacher) teacher.hidden = input.value !== 'teacher';
+  // The join-code field only applies to students.
+  document.querySelectorAll('input[name="role"]').forEach(input => input.addEventListener('change', () => {
+    const codeField = document.getElementById('signup-code-field');
+    if (codeField) codeField.hidden = input.value !== 'student';
   }));
 }
 
@@ -72,16 +69,12 @@ export function attachAuthHandlers(onAuthSuccess) {
     const name = $('#signup-name').value.trim(), email = $('#signup-email').value.trim(), password = $('#signup-password').value;
     const role = $('input[name="role"]:checked').value;
     const joinCode = $('#signup-code').value.trim().toUpperCase();
-    const teacherCode = $('#signup-teacher-code').value.trim();
     $('#signup-error').textContent = '';
     try {
-      if (role === 'student') {
-        if (!joinCode) { $('#signup-error').textContent = 'Enter your class join code.'; return; }
-        await createAccount(email, password, name, role, joinCode, null, onAuthSuccess);
-      } else {
-        if (!teacherCode) { $('#signup-error').textContent = 'Enter the teacher access code.'; return; }
-        await createAccount(email, password, name, role, null, teacherCode, onAuthSuccess);
-      }
+      // Open SaaS registration: teachers sign up directly, students join with
+      // their class code.
+      if (role === 'student' && !joinCode) { $('#signup-error').textContent = 'Enter your class join code.'; return; }
+      await createAccount(email, password, name, role, role === 'student' ? joinCode : null, onAuthSuccess);
     } catch (err) { $('#signup-error').textContent = err.message || 'Something went wrong.'; }
   });
 }
@@ -113,21 +106,23 @@ async function applyPendingSignup() {
   }
 }
 
-async function createAccount(email, password, name, role, joinCode, teacherCode, onAuthSuccess) {
-  const { data, error } = await supabase.auth.signUp({ email, password });
+async function createAccount(email, password, name, role, joinCode, onAuthSuccess) {
+  // The chosen role travels in the auth metadata so the database trigger can
+  // assign it at profile creation (the client may never set roles directly).
+  const { data, error } = await supabase.auth.signUp({
+    email, password, options: { data: { role, full_name: name } }
+  });
   if (error) throw error;
   if (!data.user) throw new Error('Account not created. Check your details and try again.');
   if (!data.session) {
-    // Email-confirmation mode: no session yet, so profile edits and class
-    // joins would be rejected. Stash them and finish after sign-in.
+    // Email-confirmation mode: no session yet, so the class join would be
+    // rejected. Stash it and finish after sign-in (the role is already stored
+    // and applied by the trigger at confirmation time).
     stashPending({ name, role, joinCode });
     throw new Error('Account created — check your email to confirm it, then sign in.');
   }
-  if (role === 'teacher') {
-    await claimTeacherRole(data.user.id, teacherCode);
-  }
-  // Update the auto-created profile's display name (role stays 'student'
-  // unless the teacher claim above promoted it).
+  // Confirm the display name (the trigger already set it from the metadata;
+  // this covers databases running an older trigger).
   const { error: profErr } = await supabase.from('profiles').update({ full_name: name }).eq('id', data.user.id);
   if (profErr) throw profErr;
   if (role === 'student' && joinCode) {
@@ -138,31 +133,6 @@ async function createAccount(email, password, name, role, joinCode, teacherCode,
   onAuthSuccess(profile);
 }
 
-async function claimTeacherRole(userId, teacherCode) {
-  const { error } = await supabase.rpc('claim_teacher_role', { p_code: teacherCode });
-  if (!error) return;
-  // Fallback for databases where the migration has not been applied yet: the
-  // legacy path updated the role directly (blocked once the trigger exists).
-  if (error.code === '42883' || /does not exist|not found|schema cache/i.test(error.message || '')) {
-    const { error: legacyErr } = await supabase.from('profiles').update({ role: 'teacher' }).eq('id', userId);
-    if (!legacyErr) return;
-  }
-  await supabase.auth.signOut();
-  throw new Error('That teacher access code is not valid.');
-}
-
 export async function signOut() {
   await supabase.auth.signOut();
-}
-
-export async function fetchTeacherAccessCode() {
-  const { data, error } = await supabase.rpc('get_teacher_access_code');
-  if (error) throw error;
-  return data;
-}
-
-export async function rotateTeacherAccessCode() {
-  const { data, error } = await supabase.rpc('rotate_teacher_code');
-  if (error) throw error;
-  return data;
 }
