@@ -1,4 +1,5 @@
 import { $, $$, canvas, paperWrap, state, screenToWorld, worldToScreen, snap, pretty, pointDistance, eventPoint, polylineDistance, segmentDistance, closestPointOnSegment, showToast, setTool, setToolTip, canvasCursor, toolCopy, updateReadout, render, clampScale, ALL_SHAPES, shapeDistance, setDarkMode } from './core.js';
+import { renderA4DataURL } from './print.js';
 import { commit, undo, redo, updateHistory } from './history.js';
 import { beginPerpendicular, beginAnyPerpendicular, findReferenceLine, setConstructionLine, constrainSetSquare, updateConstructionPanel } from './construction.js';
 
@@ -109,6 +110,19 @@ $('#apply-range').addEventListener('click', () => { const xmin = Number($('#x-mi
 $('#plot-button').addEventListener('click', plotEquation); $('#expression-input').addEventListener('keydown', e => { if (e.key === 'Enter') plotEquation() });
 $('#equation-help').addEventListener('click', () => showToast('Examples: 2*x + 1, x^2 - 4, sin(x). Use radians for trig.'));
 $('#export-button').addEventListener('click', () => { render(); const exportCanvas = document.createElement('canvas'); exportCanvas.width = canvas.width; exportCanvas.height = canvas.height; const ex = exportCanvas.getContext('2d'); ex.drawImage(canvas, 0, 0); const a = document.createElement('a'); a.download = `${$('.document-name input').value.trim() || 'graphboard'}.png`; a.href = exportCanvas.toDataURL('image/png'); a.click(); showToast('Graph exported as a PNG'); });
+$('#print-a4-button')?.addEventListener('click', () => {
+  showToast('Preparing A4 print…');
+  setTimeout(() => {
+    let url;
+    try { url = renderA4DataURL(); } catch (err) { showToast('Could not prepare the print page.'); return; }
+    const img = document.getElementById('print-sheet-image');
+    let printed = false;
+    const printOnce = () => { if (!printed) { printed = true; window.print(); } };
+    img.onload = printOnce;
+    img.src = url;
+    if (img.complete) printOnce();
+  }, 40);
+});
 $('#settings-collapse').addEventListener('click', () => showToast('Graph settings stay available on the right.'));
 document.addEventListener('keydown', e => {
   const tag = document.activeElement.tagName; if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); e.shiftKey ? redo() : undo(); return; }
