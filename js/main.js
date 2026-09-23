@@ -7,7 +7,7 @@ import { updateHistory } from './history.js';
 import { state, loadState, render, $, showToast, initTheme } from './core.js';
 import { supabase, getProfile } from './supabase.js';
 import { showAuthView, attachAuthHandlers } from './auth.js';
-import { showDashboard, bindDashboardActions } from './dashboard.js';
+import { showDashboard, showWorkspace, bindDashboardActions } from './dashboard.js';
 import { serializeState, deserializeState } from './serialize.js';
 import { recordVideo } from './recorder.js';
 
@@ -82,6 +82,7 @@ async function boot() {
 
   bindDashboardActions(route);
   attachAuthHandlers(route);
+  document.getElementById('auth-skip')?.addEventListener('click', showWorkspace);
 
   try {
     await withTimeout(getProfile(), 6000);

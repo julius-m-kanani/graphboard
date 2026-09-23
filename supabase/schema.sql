@@ -64,18 +64,26 @@ create table if not exists public.settings (
   updated_at timestamptz not null default now()
 );
 
--- Teacher access code: auto-generated, rotatable. Any authenticated teacher can
--- read it or rotate it to a new random code.
+-- Teacher access code: auto-generated, rotatable. Only teachers/admins can read
+-- it or rotate it to a new random code.
 create or replace function public.rotate_teacher_code()
 returns text
-language sql
+language plpgsql
 security definer set search_path = public
 as $$
+declare
+  v_code text;
+begin
+  if not public.is_teacher() then
+    raise exception 'Only teachers can rotate the access code';
+  end if;
   insert into public.settings (key, value)
   values ('teacher_access_code', upper(substr(md5(random()::text), 1, 8)))
   on conflict (key) do update
     set value = excluded.value, updated_at = now()
-  returning value;
+  returning value into v_code;
+  return v_code;
+end;
 $$;
 
 create or replace function public.get_teacher_access_code()
@@ -86,6 +94,85 @@ stable
 as $$
   select value from public.settings where key = 'teacher_access_code';
 $$;
+
+-- is_teacher() reports whether the caller is a teacher or admin. Security
+-- definer so policies and functions can check the role without RLS recursion.
+create or replace function public.is_teacher()
+returns boolean
+language sql
+security definer set search_path = public
+stable
+as $$
+  select exists (
+    select 1 from public.profiles p
+    where p.id = auth.uid() and p.role in ('teacher', 'admin')
+  );
+$$;
+
+-- Claim the teacher role during signup. Validates the teacher access code
+-- server-side and promotes the caller from student to teacher. The client must
+-- NOT update profiles.role directly (blocked by the trigger below).
+create or replace function public.claim_teacher_role(p_code text)
+returns void
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+  v_code text;
+begin
+  if auth.uid() is null then
+    raise exception 'Sign in before claiming the teacher role';
+  end if;
+  select value into v_code from public.settings where key = 'teacher_access_code';
+  if v_code is null or p_code is null or upper(trim(p_code)) <> v_code then
+    raise exception 'That teacher access code is not valid';
+  end if;
+  perform set_config('app.teacher_claim', 'true', true);
+  update public.profiles set role = 'teacher' where id = auth.uid();
+end;
+$$;
+
+-- Guard the profiles.role column. The "own profile" RLS policy lets users edit
+-- their own row (name), but without this trigger anyone could promote
+-- themselves to teacher/admin with a direct API update. Allowed transitions:
+--   - admins may change any role (via admin_set_role);
+--   - the teacher-signup claim (flag set by claim_teacher_role);
+--   - self-promotion to admin while no admin exists yet (first-admin bootstrap,
+--     mirroring admin_set_role).
+create or replace function public.enforce_profile_role()
+returns trigger
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+  v_admin_count bigint;
+begin
+  if new.role is not distinct from old.role then
+    return new;
+  end if;
+  if public.is_admin() then
+    return new;
+  end if;
+  if current_setting('app.teacher_claim', true) = 'true'
+     and old.role = 'student' and new.role = 'teacher'
+     and new.id = auth.uid() then
+    return new;
+  end if;
+  select count(*) into v_admin_count from public.profiles where role = 'admin';
+  if v_admin_count = 0 and new.id = auth.uid() and new.role = 'admin' then
+    return new;
+  end if;
+  raise exception 'Only an admin can change roles';
+end;
+$$;
+
+drop trigger if exists protect_profile_role on public.profiles;
+create trigger protect_profile_role
+  before update on public.profiles
+  for each row execute function public.enforce_profile_role();
+
+grant execute on function public.is_teacher() to authenticated;
+grant execute on function public.claim_teacher_role(text) to authenticated;
 
 -- Seed an initial teacher access code if the settings table is empty
 insert into public.settings (key, value)
@@ -176,14 +263,22 @@ grant execute on function public.teacher_can_read_student(uuid) to authenticated
 create policy "teachers read student profiles" on public.profiles
   for select using (public.teacher_can_read_student(id));
 
--- Classes: teacher owns, students can join by code
+-- Classes: teacher owns. Only teachers/admins can create classes (the plain
+-- ownership check alone would let any student create a class naming
+-- themselves teacher).
+drop policy if exists "teachers manage own classes" on public.classes;
 create policy "teachers manage own classes" on public.classes
-  for all using (auth.uid() = teacher_id) with check (auth.uid() = teacher_id);
+  for all
+  using (auth.uid() = teacher_id)
+  with check (auth.uid() = teacher_id and public.is_teacher());
 
-create policy "students read classes by join code" on public.classes
+-- Students can read the classes they have joined. Joining itself goes through
+-- the join_class() RPC, so there is no need to expose the full class list
+-- (names and join codes) to every student.
+drop policy if exists "students read classes by join code" on public.classes;
+create policy "students read member classes" on public.classes
   for select using (
-    join_code is not null
-    and exists (select 1 from public.profiles p where p.id = auth.uid() and p.role = 'student')
+    exists (select 1 from public.class_members m where m.class_id = public.classes.id and m.student_id = auth.uid())
   );
 
 -- Class members: students can join, members can read
@@ -256,10 +351,13 @@ create policy "teachers read submissions" on public.submissions
 create policy "teachers read settings" on public.settings
   for select using (exists (select 1 from public.profiles p where p.id = auth.uid() and p.role = 'teacher'));
 
--- The access code is read pre-auth (during the signup form), so it is exposed to
--- anon; this mirrors having it baked into the client. Rotation is authenticated-only.
+-- The access code is validated server-side by claim_teacher_role() during
+-- signup. Authenticated teachers read it for display/rotation; it is no
+-- longer exposed to anon. Rotation is authenticated-only and role-checked
+-- inside the function.
+revoke execute on function public.get_teacher_access_code() from anon;
 grant execute on function public.rotate_teacher_code() to authenticated;
-grant execute on function public.get_teacher_access_code() to anon, authenticated;
+grant execute on function public.get_teacher_access_code() to authenticated;
 
 -- Admins can read and manage everything.
 create policy "admin full access profiles" on public.profiles

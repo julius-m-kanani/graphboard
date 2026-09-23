@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#f6f2e9" />
+    <meta name="theme-color" content="#edf1f5" />
     <title>Graphboard — free online graph paper & classroom geometry set</title>
     <meta name="description" content="Graphboard is a free, no-install online graph paper workspace for school. Draw a Cartesian plane, plot equations, and use a compass, ruler, set square and protractor to build classic Euclidean constructions." />
     <meta name="keywords" content="graph paper, graphing calculator, Cartesian plane, compass and ruler, geometry tools, equation plotter, online graph paper, classroom, Euclidean construction" />
@@ -48,8 +48,14 @@
     }
     </script>
 
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
     <link rel="stylesheet" href="styles.css" />
-    <script>try{var t=localStorage.getItem('graphboard-theme');if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme: dark)').matches))document.documentElement.dataset.theme='dark';}catch(e){}</script>
+    <script>try{var q=new URLSearchParams(location.search).get('theme');var t=q==='dark'||q==='light'?q:localStorage.getItem('graphboard-theme');if(t==='dark'||(!q&&!t&&matchMedia('(prefers-color-scheme: dark)').matches))document.documentElement.dataset.theme='dark';if(q)localStorage.setItem('graphboard-theme',q);}catch(e){}</script>
   </head>
   <body>
     <main class="app-shell" id="workspace-view">
@@ -125,7 +131,7 @@
               <span class="tool-icon move-icon"></span><span>Move</span><kbd>M</kbd>
             </button>
             <button class="tool" data-tool="hand" title="Hand — move the paper">
-              <span class="tool-icon hand-icon">✋</span><span>Move paper</span><kbd>H</kbd>
+              <span class="tool-icon hand-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18M3 12h18"/><path d="M12 3 9 6m3-3 3 3M12 21l-3-3m3 3 3-3M3 12l3-3m-3 3 3 3M21 12l-3-3m3 3-3 3"/></svg></span><span>Move paper</span><kbd>H</kbd>
             </button>
             <button class="tool" data-tool="eraser" title="Eraser — remove a nearby mark">
               <span class="tool-icon eraser-icon"></span><span>Rubber / eraser</span><kbd>E</kbd>
@@ -305,6 +311,7 @@
           <button class="auth-submit" type="submit">Create account</button>
           <p class="auth-error" id="signup-error" aria-live="polite"></p>
         </form>
+        <button class="text-button auth-skip" id="auth-skip" type="button">Continue without signing in →</button>
       </div>
     </section>
 

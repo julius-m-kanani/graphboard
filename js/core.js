@@ -23,17 +23,20 @@ export function resolveInk(color) {
   return LIGHT_REMAP[key] || color;
 }
 // Canvas palette per theme: blackboard uses a near-black green paper with
-// chalk-white grid lines, axes and labels.
+// chalk-white grid lines, axes and labels. Grid tones are deliberately kept
+// well clear of the paper colour (and drawn on whole pixels in draw.js) so
+// the squares stay visible from the back of a classroom or on a projector,
+// which crushes the faint hairlines most graph-paper apps use.
 export function canvasPalette() {
   if (state.darkMode) {
     return {
-      paper: '#151a1b', minor: '#ffffff12', unit: '#ffffff24', major: '#ffffff38', dot: '#ffffff40',
+      paper: '#151a1b', minor: '#ffffff26', unit: '#ffffff40', major: '#ffffff63', dot: '#ffffff4d',
       axis: '#e8ecec', label: '#9aa7ab', labelAxis: '#d7dedf', hole: '#151a1b',
       guide: '#cfd8da', construction: '#e0a86e'
     };
   }
   return {
-    paper: '#fffefa', minor: '#e8eded', unit: '#dbe4e3', major: '#d3dcdb', dot: '#d9e0df',
+    paper: '#fffefa', minor: '#d9e0df', unit: '#c3d2d0', major: '#a3b8b6', dot: '#b9c8c6',
     axis: '#536b73', label: '#718088', labelAxis: '#4b636a', hole: '#fffefa',
     guide: '#41545a', construction: '#9d7957'
   };

@@ -37,7 +37,7 @@ export function compileExpression(raw) {
   const allowed = new Set(['x', 'sin', 'cos', 'tan', 'asin', 'acos', 'atan', 'abs', 'sqrt', 'log', 'ln', 'exp', 'pi', 'e']); const words = expr.match(/[a-z]+/g) || []; if (words.some(w => !allowed.has(w))) throw Error('Try x, sin, cos, sqrt, or other standard functions');
   expr = expr.replace(/\bln\b/g, 'Math.log').replace(/\b(sin|cos|tan|asin|acos|atan|abs|sqrt|log|exp)\b/g, 'Math.$1').replace(/\bpi\b/g, 'Math.PI').replace(/\be\b/g, 'Math.E').replace(/\bx\b/g, 'x'); return new Function('x', `"use strict"; return (${expr});`);
 }
-function plotEquation() { const input = $('#expression-input'); try { const fn = compileExpression(input.value); commit({ type: 'plot', fn, color: state.color, expression: input.value }); showToast(`Plotted y = ${input.value.replace(/^y\s*=\s*/i, '')}`); input.value = ''; } catch (err) { showToast(err.message); } }
+function plotEquation() { if (window.__builderReadOnly) { showToast('Preview is read-only — click Edit to keep building.'); return; } const input = $('#expression-input'); try { const fn = compileExpression(input.value); commit({ type: 'plot', fn, color: state.color, expression: input.value }); showToast(`Plotted y = ${input.value.replace(/^y\s*=\s*/i, '')}`); input.value = ''; } catch (err) { showToast(err.message); } }
 
 function endDraw(e) {
   if (state.tool === 'move') { state.drag = null; canvas.style.cursor = canvasCursor(); render(); return; }
@@ -53,6 +53,7 @@ function endDraw(e) {
 
 canvas.addEventListener('pointerdown', e => {
   e.preventDefault(); try { canvas.setPointerCapture(e.pointerId); } catch (err) {} const s = eventPoint(e); state.pointer = s; const rawWorld = screenToWorld(s); const constructionFree = state.construction && (state.tool === 'compass' || (state.tool === 'ruler' && (state.construction.step === 'ruler' || state.construction.step === 'choose-line')) || (state.tool === 'point' && state.construction.step === 'pick-point' && state.construction.mode === 'any')); const w = state.tool === 'pencil' || state.tool === 'eraser' || constructionFree ? rawWorld : snap(rawWorld);
+  if (window.__builderReadOnly && state.tool !== 'hand' && !e.shiftKey && e.button !== 1) { showToast('Preview is read-only — click Edit to keep building.'); return; }
   if (state.tool === 'eraser') { eraseNear(w); return; }
   if (state.tool === 'move') { const target = pickAction(rawWorld); if (target) { state.drag = { action: target, from: { ...rawWorld } }; canvas.style.cursor = 'grabbing'; render(); } return; }
   if (state.tool === 'label') { showLabelEditor(rawWorld, pickPointNear(rawWorld)); return; }
@@ -97,7 +98,7 @@ $('#perpendicular-button').addEventListener('click', beginPerpendicular);
 $('#any-perpendicular-button').addEventListener('click', beginAnyPerpendicular);
 $$('.swatch').forEach(b => b.addEventListener('click', () => { state.color = b.dataset.color; $$('.swatch').forEach(s => s.classList.toggle('active', s === b)); }));
 $('#undo-button').addEventListener('click', undo); $('#redo-button').addEventListener('click', redo);
-$('#clear-button').addEventListener('click', () => { if (!state.actions.length) return; state.redo.push(...state.actions); state.actions = []; updateHistory(); render(); showToast('The page is clear'); });
+$('#clear-button').addEventListener('click', () => { if (window.__builderReadOnly) { showToast('Preview is read-only — click Edit to keep building.'); return; } if (!state.actions.length) return; state.redo.push(...state.actions); state.actions = []; updateHistory(); render(); showToast('The page is clear'); });
 $('#zoom-in').addEventListener('click', () => zoomBy(1.2)); $('#zoom-out').addEventListener('click', () => zoomBy(.83));
 $('#grid-toggle').addEventListener('click', () => { state.showGrid = !state.showGrid; render(); showToast(state.showGrid ? 'Grid shown' : 'Grid hidden'); });
 $('#theme-toggle')?.addEventListener('click', () => { setDarkMode(!state.darkMode); showToast(state.darkMode ? 'Blackboard mode — chalk on dark' : 'White paper mode'); });

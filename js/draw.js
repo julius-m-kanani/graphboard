@@ -16,31 +16,39 @@ function renderGrid() {
     const min = screenToWorld({ x: 0, y: height }); const max = screenToWorld({ x: width, y: 0 });
     const minor = minorGridStep();
     const fromX = Math.floor(min.x / minor) - 1, toX = Math.ceil(max.x / minor) + 1, fromY = Math.floor(min.y / minor) - 1, toY = Math.ceil(max.y / minor) + 1;
+    // Snap lines to whole device pixels: a 1px line drawn at a fractional
+    // coordinate anti-aliases across two pixels at half strength and almost
+    // disappears on a projector. Rounding first keeps full contrast.
+    const crisp = (v) => Math.round(v) + 0.5;
     if (state.paper === 'dot') {
       ctx.fillStyle = pal.dot;
-      for (let ix = fromX; ix <= toX; ix++) for (let iy = fromY; iy <= toY; iy++) { const p = worldToScreen({ x: ix * minor, y: iy * minor }); ctx.beginPath(); ctx.arc(p.x, p.y, 1, 0, Math.PI * 2); ctx.fill(); }
+      for (let ix = fromX; ix <= toX; ix++) for (let iy = fromY; iy <= toY; iy++) { const p = worldToScreen({ x: ix * minor, y: iy * minor }); ctx.beginPath(); ctx.arc(p.x, p.y, 1.5, 0, Math.PI * 2); ctx.fill(); }
     } else {
       for (let ix = fromX; ix <= toX; ix++) {
         const x = ix * minor, p = worldToScreen({ x, y: 0 });
+        const sx = crisp(p.x);
         ctx.beginPath();
-        if (isMultiple(x, 5)) { ctx.strokeStyle = pal.major; ctx.lineWidth = 1; }
-        else if (isMultiple(x, 1)) { ctx.strokeStyle = pal.unit; ctx.lineWidth = .8; }
-        else { ctx.strokeStyle = pal.minor; ctx.lineWidth = .65; }
-        ctx.moveTo(p.x, 0); ctx.lineTo(p.x, height); ctx.stroke();
+        if (isMultiple(x, 5)) { ctx.strokeStyle = pal.major; ctx.lineWidth = 1.25; }
+        else if (isMultiple(x, 1)) { ctx.strokeStyle = pal.unit; ctx.lineWidth = 1; }
+        else { ctx.strokeStyle = pal.minor; ctx.lineWidth = 1; }
+        ctx.moveTo(sx, 0); ctx.lineTo(sx, height); ctx.stroke();
       }
       for (let iy = fromY; iy <= toY; iy++) {
         const y = iy * minor, p = worldToScreen({ x: 0, y });
+        const sy = crisp(p.y);
         ctx.beginPath();
-        if (isMultiple(y, 5)) { ctx.strokeStyle = pal.major; ctx.lineWidth = 1; }
-        else if (isMultiple(y, 1)) { ctx.strokeStyle = pal.unit; ctx.lineWidth = .8; }
-        else { ctx.strokeStyle = pal.minor; ctx.lineWidth = .65; }
-        ctx.moveTo(0, p.y); ctx.lineTo(width, p.y); ctx.stroke();
+        if (isMultiple(y, 5)) { ctx.strokeStyle = pal.major; ctx.lineWidth = 1.25; }
+        else if (isMultiple(y, 1)) { ctx.strokeStyle = pal.unit; ctx.lineWidth = 1; }
+        else { ctx.strokeStyle = pal.minor; ctx.lineWidth = 1; }
+        ctx.moveTo(0, sy); ctx.lineTo(width, sy); ctx.stroke();
       }
     }
   }
   const note = document.querySelector('.canvas-corner-note');
   if (note) note.innerHTML = state.paper === 'blank' || !state.showGrid ? '' : `GRAPH PAPER&nbsp; · &nbsp;SQUARES = ${gridFraction(minorGridStep())} UNIT`;
-  ctx.strokeStyle = pal.axis; ctx.lineWidth = 1.35; ctx.beginPath(); ctx.moveTo(0, state.origin.y); ctx.lineTo(width, state.origin.y); ctx.moveTo(state.origin.x, 0); ctx.lineTo(state.origin.x, height); ctx.stroke();
+  ctx.strokeStyle = pal.axis; ctx.lineWidth = 2; ctx.beginPath();
+  const ax = Math.round(state.origin.x), ay = Math.round(state.origin.y);
+  ctx.moveTo(0, ay); ctx.lineTo(width, ay); ctx.moveTo(ax, 0); ctx.lineTo(ax, height); ctx.stroke();
   const axisArrow = (x, y, angle) => { ctx.save(); ctx.translate(x, y); ctx.rotate(angle); ctx.fillStyle = pal.axis; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(-6, 3); ctx.lineTo(-6, -3); ctx.closePath(); ctx.fill(); ctx.restore(); };
   axisArrow(width - 4, state.origin.y, 0); axisArrow(4, state.origin.y, Math.PI); axisArrow(state.origin.x, 4, -Math.PI / 2); axisArrow(state.origin.x, height - 4, Math.PI / 2);
   if (state.showLabels) renderLabels();

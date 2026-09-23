@@ -41,6 +41,7 @@ let currentProfile = null;
 
 export async function showDashboard(profile) {
   currentProfile = profile;
+  resetModes();
   $('#auth-view').hidden = true;
   $('#dashboard-view').hidden = false;
   $('#workspace-view').hidden = true;
@@ -65,16 +66,36 @@ export async function showDashboard(profile) {
   }
 }
 
-function showWorkspace() {
-  currentProfile = null;
+export function showWorkspace() {
+  resetModes();
   $('#auth-view').hidden = true;
   $('#dashboard-view').hidden = true;
   $('#workspace-view').hidden = false;
   $('#classroom-button').hidden = false;
   $('#back-button').hidden = true;
-  const strip = $('#review-strip'); if (strip) strip.hidden = true;
   resizeCanvas();
   updateHistory();
+}
+
+// Clear per-mode UI so the builder, exercise, review and submission states
+// never leak into each other when switching views.
+function resetModes() {
+  window.__activeExercise = null;
+  window.__activeSubmission = null;
+  window.__builderReadOnly = false;
+  builderState = { classId: null, mode: 'build', extractedSteps: [] };
+  $('#exercise-badge').hidden = true;
+  $('#builder-badge').hidden = true;
+  $('#builder-extract').hidden = true;
+  $('#builder-preview').hidden = true;
+  $('#builder-assign').hidden = true;
+  $('#builder-preview').textContent = 'Preview';
+  const panel = $('#builder-panel'); if (panel) panel.hidden = true;
+  const bar = $('#submission-bar'); if (bar) bar.hidden = true;
+  const strip = $('#review-strip'); if (strip) { strip.hidden = true; strip.innerHTML = ''; }
+  $$('.tool').forEach(t => t.classList.remove('disabled'));
+  const shapeSel = $('#shape-select'); if (shapeSel) shapeSel.disabled = false;
+  const shape3dSel = $('#shape3d-select'); if (shape3dSel) shape3dSel.disabled = false;
 }
 
 // ---------- Teacher ----------
@@ -190,11 +211,17 @@ function openForReview(submission, exercise) {
   loadState(deserializeState(saved));
   window.__activeExercise = exercise;
   window.__activeSubmission = submission;
+  window.__builderReadOnly = false;
   $('#exercise-title').textContent = exercise.title + ' (review)';
   $('#exercise-class').textContent = (submission.profiles?.full_name || 'student') + ' — review only';
   $('#exercise-badge').hidden = false;
   $('#back-button').hidden = false;
   $('#submission-bar').hidden = true;
+  $('#builder-badge').hidden = true;
+  $('#builder-extract').hidden = true;
+  $('#builder-preview').hidden = true;
+  $('#builder-assign').hidden = true;
+  const builderPanel = $('#builder-panel'); if (builderPanel) builderPanel.hidden = true;
   $('#dashboard-view').hidden = true;
   $('#workspace-view').hidden = false;
   resizeCanvas();
@@ -220,6 +247,9 @@ async function setupReviewStrip(submission) {
     if (!saved.actions || !saved.actions.length) { showToast('No drawing in this submission.'); return; }
     replay.disabled = true;
     replay.textContent = 'Recording…';
+    // renderActionsToVideo replays onto the live canvas, leaving partial
+    // duplicate marks behind — snapshot and restore the current page.
+    const snapshot = serializeCurrentState();
     try {
       const blob = await renderActionsToVideo(saved.actions, { fps: 20, frameMs: 35, perMarkMs: 160, tailMs: 500, leadInMs: 250 });
       const url = URL.createObjectURL(blob);
@@ -231,6 +261,9 @@ async function setupReviewStrip(submission) {
     } catch (err) {
       showToast('Could not record: ' + err.message);
     } finally {
+      loadState(deserializeState(snapshot));
+      render();
+      updateHistory();
       replay.disabled = false;
       replay.textContent = 'Replay session';
     }
@@ -436,6 +469,7 @@ async function openExerciseBuilder(classId) {
   builderState.classId = classId;
   builderState.mode = 'build';
   builderState.extractedSteps = [];
+  window.__builderReadOnly = false;
   
   // Switch to workspace in builder mode
   $('#dashboard-view').hidden = true;
@@ -448,6 +482,7 @@ async function openExerciseBuilder(classId) {
   $('#builder-assign').hidden = false;
   $('#back-button').hidden = true;
   $('#submission-bar').hidden = true;
+  const strip = $('#review-strip'); if (strip) strip.hidden = true;
   $('#builder-panel').hidden = false;
   
   // Clear canvas for fresh drawing
@@ -468,6 +503,10 @@ function clearCanvasForBuilder() {
 
 function exitBuilder() {
   builderState = { classId: null, mode: 'build', extractedSteps: [] };
+  window.__builderReadOnly = false;
+  $$('.tool').forEach(t => t.classList.remove('disabled'));
+  const shapeSel = $('#shape-select'); if (shapeSel) shapeSel.disabled = false;
+  const shape3dSel = $('#shape3d-select'); if (shape3dSel) shape3dSel.disabled = false;
   $('#workspace-view').hidden = true;
   $('#dashboard-view').hidden = false;
   $('#builder-badge').hidden = true;
@@ -483,6 +522,7 @@ function exitBuilder() {
 function toggleBuilderPreview() {
   if (builderState.mode === 'build') {
     builderState.mode = 'preview';
+    window.__builderReadOnly = true;
     $('#builder-preview').textContent = 'Edit';
     $('#builder-status').textContent = 'Preview mode — read only';
     $('#builder-extract').hidden = true;
@@ -499,6 +539,7 @@ function toggleBuilderPreview() {
     $('#submission-bar').hidden = true;
   } else {
     builderState.mode = 'build';
+    window.__builderReadOnly = false;
     $('#builder-preview').textContent = 'Preview';
     $('#builder-status').textContent = 'Build mode — draw the solution';
     $('#builder-extract').hidden = false;
@@ -520,18 +561,19 @@ function extractSteps() {
   const counts = {};
   actions.forEach(a => { counts[a.type] = (counts[a.type] || 0) + 1; });
   
-  // Map action types to step types (STEP_TYPES from autocheck.js)
+  // Map stored action types to step types (STEP_TYPES from autocheck.js).
+  // Note: the canvas stores 'set-square' (not 'set45'/'set60') and 'angle'
+  // (not 'protractor'), so those are the keys that actually occur.
   const stepTypeMap = {
     'line': 'line',
     'ruler': 'ruler',
     'ray': 'ray',
     'dotted': 'dotted',
-    'set45': 'set-square',
-    'set60': 'set-square',
+    'set-square': 'set-square',
     'point': 'point',
     'circle': 'circle',
     'compass': 'compass',
-    'protractor': 'angle',
+    'angle': 'angle',
     'pencil': 'pencil',
     'plot': 'plot',
     'dividers': 'compass', // dividers count as compass
@@ -568,14 +610,11 @@ function extractSteps() {
     }
   });
   
-  // Deduplicate by type (sum counts)
+  // Merge entries that mapped to the same step type (sum the counts).
   const merged = {};
   builderState.extractedSteps.forEach(s => {
-    if (!merged[s.type] || merged[s.type].count < s.count) {
-      merged[s.type] = { type: s.type, count: s.count, label: s.label };
-    } else {
-      merged[s.type].count += s.count;
-    }
+    if (merged[s.type]) merged[s.type].count += s.count;
+    else merged[s.type] = { ...s };
   });
   builderState.extractedSteps = Object.values(merged);
   
@@ -826,6 +865,13 @@ async function openExercise(exerciseId) {
   }
   window.__activeExercise = exercise;
   window.__activeSubmission = submission;
+  window.__builderReadOnly = false;
+  $('#builder-badge').hidden = true;
+  $('#builder-extract').hidden = true;
+  $('#builder-preview').hidden = true;
+  $('#builder-assign').hidden = true;
+  const builderPanel = $('#builder-panel'); if (builderPanel) builderPanel.hidden = true;
+  const strip = $('#review-strip'); if (strip) strip.hidden = true;
   const saved = submission ? (typeof submission.actions === 'string' ? JSON.parse(submission.actions || '{}') : submission.actions || {}) : null;
   loadState(saved ? deserializeState(saved) : {});
   $('#dashboard-view').hidden = true;
@@ -840,16 +886,18 @@ async function openExercise(exerciseId) {
 export async function saveWork(submit = false) {
   const exercise = window.__activeExercise;
   if (!exercise) return;
+  if (!currentProfile) { showToast('Sign in to save your work.'); return; }
   const serialized = serializeCurrentState();
   let videoBlob = null;
   if (submit) {
-    const btn = $('#submit-work-button');
-    if (btn) btn.disabled = true;
+    // Recording replays onto the live canvas; lock the workspace so the
+    // student's marks cannot change (or be wiped on restore) mid-record.
+    lockWorkspace(true);
     try {
       showToast('Recording your work for submission…');
       videoBlob = await recordSubmissionVideo(serialized);
     } finally {
-      if (btn) btn.disabled = false;
+      lockWorkspace(false);
     }
   }
   const graded = submit ? gradeSubmission(exercise, serialized) : null;
@@ -875,9 +923,24 @@ export async function saveWork(submit = false) {
     window.__activeSubmission = { id };
   }
   const videoPath = submit ? await storeSubmissionVideo(id, videoBlob) : null;
-  const base = graded ? `Submitted! Score: ${graded.score}%` : 'Submitted! Your teacher can now see your work.';
-  showToast(videoPath ? base + ' — recording saved.' : base);
-  if (submit) $('#submission-status').textContent = graded ? `Submitted. Score: ${graded.score}% — ${graded.feedback}` : 'Submitted.';
+  if (submit) {
+    const base = graded ? `Submitted! Score: ${graded.score}%` : 'Submitted! Your teacher can now see your work.';
+    showToast(videoPath ? base + ' — recording saved.' : base);
+    $('#submission-status').textContent = graded ? `Submitted. Score: ${graded.score}% — ${graded.feedback}` : 'Submitted.';
+  } else {
+    showToast('Draft saved — your teacher cannot see it until you submit.');
+    $('#submission-status').textContent = 'Draft saved.';
+  }
+}
+
+// Disable editing controls (and pointer input) while a submission recording
+// replays onto the live canvas.
+function lockWorkspace(on) {
+  ['save-work-button', 'submit-work-button', 'undo-button', 'redo-button', 'clear-button'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.disabled = on;
+  });
+  if (canvas) canvas.style.pointerEvents = on ? 'none' : '';
 }
 
 function serializeCurrentState() {
@@ -887,6 +950,9 @@ function serializeCurrentState() {
 export function bindDashboardActions(onAuthSuccess) {
   $('#logout-button').addEventListener('click', async () => {
     await supabase.auth.signOut();
+    window.__activeExercise = null;
+    window.__activeSubmission = null;
+    window.__builderReadOnly = false;
     onAuthSuccess(null);
   });
   $('#new-class-button').addEventListener('click', createClass);
