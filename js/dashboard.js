@@ -7,22 +7,12 @@ import { updateHistory } from './history.js';
 import { renderActionsToVideo } from './recorder.js';
 import { parseSteps, gradeSubmission, STEP_TYPES } from './autocheck.js';
 
-function blobToDataURL(blob) {
-  return new Promise((resolve, reject) => {
-    const fr = new FileReader();
-    fr.onload = () => resolve(fr.result);
-    fr.onerror = () => reject(fr.error);
-    fr.readAsDataURL(blob);
-  });
-}
-
 async function recordSubmissionVideo(serialized) {
   const saved = deserializeState(serialized);
   if (!saved?.actions?.length) return null;
   if (!window.MediaRecorder || !canvas.captureStream) return null;
   try {
-    const blob = await renderActionsToVideo(saved.actions, { fps: 15, frameMs: 30, perMarkMs: 80, tailMs: 250, leadInMs: 150, bitrate: 1_500_000 });
-    return await blobToDataURL(blob);
+    return await renderActionsToVideo(saved.actions, { fps: 15, frameMs: 30, perMarkMs: 80, tailMs: 250, leadInMs: 150, bitrate: 1_500_000 });
   } catch (err) {
     console.error('Submission video failed:', err);
     return null;
@@ -30,6 +20,21 @@ async function recordSubmissionVideo(serialized) {
     loadState(saved);
     render();
   }
+}
+
+async function storeSubmissionVideo(submissionId, blob) {
+  if (!blob) return null;
+  const path = `${currentProfile.id}/${submissionId}.webm`;
+  const bucket = supabase.storage.from('submission-videos');
+  let { error } = await bucket.upload(path, blob, { contentType: 'video/webm', upsert: true });
+  if (error) {
+    await bucket.remove([path]);
+    ({ error } = await bucket.upload(path, blob, { contentType: 'video/webm' }));
+  }
+  if (error) { console.error('Video upload failed:', error); return null; }
+  const { error: upErr } = await supabase.from('submissions').update({ video: path }).eq('id', submissionId);
+  if (upErr) console.error('Video path update failed:', upErr);
+  return path;
 }
 
 let currentProfile = null;
@@ -197,7 +202,7 @@ function openForReview(submission, exercise) {
   setupReviewStrip(submission);
 }
 
-function setupReviewStrip(submission) {
+async function setupReviewStrip(submission) {
   const strip = $('#review-strip');
   if (!strip) return;
   strip.hidden = false;
@@ -233,16 +238,23 @@ function setupReviewStrip(submission) {
   strip.appendChild(replay);
 
   if (submission.video) {
-    const link = document.createElement('a');
-    link.className = 'text-button';
-    link.href = submission.video;
-    link.download = `submission-${String(submission.id).slice(0, 8)}-recording.webm`;
-    link.textContent = 'Download recorded video';
-    strip.appendChild(link);
-    const vid = document.createElement('video');
-    vid.controls = true;
-    vid.src = submission.video;
-    strip.appendChild(vid);
+    let url = submission.video;
+    if (!url.startsWith('data:')) {
+      const { data } = await supabase.storage.from('submission-videos').createSignedUrl(url, 3600);
+      url = data?.signedUrl || null;
+    }
+    if (url) {
+      const link = document.createElement('a');
+      link.className = 'text-button';
+      link.href = url;
+      link.download = `submission-${String(submission.id).slice(0, 8)}-recording.webm`;
+      link.textContent = 'Download recorded video';
+      strip.appendChild(link);
+      const vid = document.createElement('video');
+      vid.controls = true;
+      vid.src = url;
+      strip.appendChild(vid);
+    }
   }
 }
 
@@ -829,13 +841,13 @@ export async function saveWork(submit = false) {
   const exercise = window.__activeExercise;
   if (!exercise) return;
   const serialized = serializeCurrentState();
-  let video = null;
+  let videoBlob = null;
   if (submit) {
     const btn = $('#submit-work-button');
     if (btn) btn.disabled = true;
     try {
       showToast('Recording your work for submission…');
-      video = await recordSubmissionVideo(serialized);
+      videoBlob = await recordSubmissionVideo(serialized);
     } finally {
       if (btn) btn.disabled = false;
     }
@@ -851,31 +863,20 @@ export async function saveWork(submit = false) {
     submitted_at: submit ? new Date().toISOString() : null,
     updated_at: new Date().toISOString(),
   };
-  if (submit) payload.video = video;
   const existing = window.__activeSubmission;
-  let videoStored = false;
+  let id = existing?.id;
   if (existing) {
-    let { error } = await supabase.from('submissions').update(payload).eq('id', existing.id);
-    if (error && submit && payload.video) {
-      delete payload.video;
-      ({ error } = await supabase.from('submissions').update(payload).eq('id', existing.id));
-    } else { videoStored = !!payload.video && !error; }
+    const { error } = await supabase.from('submissions').update(payload).eq('id', existing.id);
     if (error) { showToast(error.message); return; }
   } else {
-    let { data, error } = await supabase.from('submissions').insert(payload).select('id').single();
-    if (error && submit && payload.video) {
-      delete payload.video;
-      ({ data, error } = await supabase.from('submissions').insert(payload).select('id').single());
-    } else { videoStored = !!payload.video && !error; }
+    const { data, error } = await supabase.from('submissions').insert(payload).select('id').single();
     if (error) { showToast(error.message); return; }
-    window.__activeSubmission = { id: data.id };
+    id = data.id;
+    window.__activeSubmission = { id };
   }
-  if (submit && videoStored) showToast(submit
-    ? (graded ? `Submitted! Score: ${graded.score}% — recording saved.` : 'Submitted with recording! Your teacher can now see your work.')
-    : 'Work saved.');
-  else showToast(submit
-    ? (graded ? `Submitted! Score: ${graded.score}%` : 'Submitted! Your teacher can now see your work.')
-    : 'Work saved.');
+  const videoPath = submit ? await storeSubmissionVideo(id, videoBlob) : null;
+  const base = graded ? `Submitted! Score: ${graded.score}%` : 'Submitted! Your teacher can now see your work.';
+  showToast(videoPath ? base + ' — recording saved.' : base);
   if (submit) $('#submission-status').textContent = graded ? `Submitted. Score: ${graded.score}% — ${graded.feedback}` : 'Submitted.';
 }
 

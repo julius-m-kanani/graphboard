@@ -1,4 +1,4 @@
-import { $, $$, canvas, paperWrap, state, screenToWorld, worldToScreen, snap, pretty, pointDistance, eventPoint, polylineDistance, segmentDistance, closestPointOnSegment, showToast, setTool, setToolTip, canvasCursor, toolCopy, updateReadout, render, clampScale, ALL_SHAPES, shapeDistance } from './core.js';
+import { $, $$, canvas, paperWrap, state, screenToWorld, worldToScreen, snap, pretty, pointDistance, eventPoint, polylineDistance, segmentDistance, closestPointOnSegment, showToast, setTool, setToolTip, canvasCursor, toolCopy, updateReadout, render, clampScale, ALL_SHAPES, shapeDistance, setDarkMode } from './core.js';
 import { commit, undo, redo, updateHistory } from './history.js';
 import { beginPerpendicular, beginAnyPerpendicular, findReferenceLine, setConstructionLine, constrainSetSquare, updateConstructionPanel } from './construction.js';
 
@@ -100,7 +100,8 @@ $('#undo-button').addEventListener('click', undo); $('#redo-button').addEventLis
 $('#clear-button').addEventListener('click', () => { if (!state.actions.length) return; state.redo.push(...state.actions); state.actions = []; updateHistory(); render(); showToast('The page is clear'); });
 $('#zoom-in').addEventListener('click', () => zoomBy(1.2)); $('#zoom-out').addEventListener('click', () => zoomBy(.83));
 $('#grid-toggle').addEventListener('click', () => { state.showGrid = !state.showGrid; render(); showToast(state.showGrid ? 'Grid shown' : 'Grid hidden'); });
-$$('.segmented button[data-snap]').forEach(b => b.addEventListener('click', () => { state.snapStep = Number(b.dataset.snap); $$('.segmented button[data-snap]').forEach(x => x.classList.toggle('active', x === b)); }));
+$('#theme-toggle')?.addEventListener('click', () => { setDarkMode(!state.darkMode); showToast(state.darkMode ? 'Blackboard mode — chalk on dark' : 'White paper mode'); });
+$$('.segmented button[data-snap]').forEach(b => b.addEventListener('click', () => { state.snapStep = Number(b.dataset.snap); $$('.segmented button[data-snap]').forEach(x => x.classList.toggle('active', x === b)); showToast(state.snapStep ? (state.snapStep === .5 ? 'Snap to ½-unit grid — new points land on half-grid intersections' : `Snap to ${state.snapStep}-unit grid — new points land on grid intersections`) : 'Snap: Free — new points land exactly where you click'); updateReadout(state.pointer); }));
 $('#labels-toggle').addEventListener('change', e => { state.showLabels = e.target.checked; render(); });
 $$('.segmented button[data-paper]').forEach(b => b.addEventListener('click', () => { state.paper = b.dataset.paper; $$('.segmented button[data-paper]').forEach(x => x.classList.toggle('active', x === b)); render(); }));
 $('#apply-range').addEventListener('click', () => { const xmin = Number($('#x-min').value), xmax = Number($('#x-max').value), ymin = Number($('#y-min').value), ymax = Number($('#y-max').value); if (![xmin, xmax, ymin, ymax].every(Number.isFinite) || xmax <= xmin || ymax <= ymin) { showToast('Enter a valid minimum and maximum range'); return; } const width = state.canvasSize.width, height = state.canvasSize.height; state.scale = clampScale(Math.min(width / (xmax - xmin), height / (ymax - ymin))); state.origin = { x: -xmin * state.scale + (width - (xmax - xmin) * state.scale) / 2, y: ymax * state.scale + (height - (ymax - ymin) * state.scale) / 2 }; $('#scale-readout').textContent = `1 unit = ${state.scale < 10 ? state.scale.toFixed(2) : Math.round(state.scale)} px`; render(); });
@@ -115,5 +116,6 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape' && state.divider) { state.divider = null; render(); showToast('Dividers lifted'); return; }
   if (e.code === 'Space') { e.preventDefault(); setTool('hand'); }
   const key = e.key.toLowerCase(); if (key === 'x' && (state.compassCarryRadius || state.divider)) { state.compassAnchor = null; state.compassCarryRadius = null; state.divider = null; const [name, copy] = toolCopy[state.tool]; setToolTip(name, copy); render(); showToast('Instrument opening released'); return; }
+  if (key === 'b' && !e.ctrlKey && !e.metaKey) { setDarkMode(!state.darkMode); showToast(state.darkMode ? 'Blackboard mode — chalk on dark' : 'White paper mode'); return; }
   const keys = { p: 'pencil', o: 'point', n: 'label', l: 'line', t: 'ray', y: 'dotted', r: 'ruler', c: 'compass', d: 'dividers', q: 'set45', w: 'set60', a: 'protractor', m: 'move', h: 'hand', e: 'eraser' }; if (keys[key]) setTool(keys[key]);
 });

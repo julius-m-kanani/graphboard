@@ -7,9 +7,73 @@ export const $$ = (s) => [...document.querySelectorAll(s)];
 export const state = {
   tool: 'pencil', color: '#244bb3', scale: 32, origin: { x: 0, y: 0 },
   actions: [], redo: [], drawing: null, pointer: { x: 0, y: 0 },
-  showGrid: true, showLabels: true, snapStep: 0.5, paper: 'square',
+  showGrid: true, showLabels: true, snapStep: 0.5, paper: 'square', darkMode: false,
   dpr: 1, canvasSize: { width: 1, height: 1 }, hovering: false, compassAnchor: null, compassCarryRadius: null, divider: null, construction: null, drag: null
 };
+
+export const THEME_KEY = 'graphboard-theme';
+// Ink remaps so marks stay readable after a theme switch. Dark inks become
+// chalk tones on the blackboard; chalk tones become dark inks on white paper.
+const DARK_REMAP = { '#24353d': '#f2f0e9', '#244bb3': '#8fb0ff', '#d75448': '#ff8a7a', '#33866b': '#5fd0a5' };
+const LIGHT_REMAP = { '#f2f0e9': '#24353d', '#f5f2e9': '#24353d', '#ffffff': '#24353d', '#8fb0ff': '#244bb3', '#ff8a7a': '#d75448', '#5fd0a5': '#33866b', '#ffd166': '#8a6d2f' };
+export function resolveInk(color) {
+  if (!color) return color;
+  const key = String(color).toLowerCase();
+  if (state.darkMode) return DARK_REMAP[key] || color;
+  return LIGHT_REMAP[key] || color;
+}
+// Canvas palette per theme: blackboard uses a near-black green paper with
+// chalk-white grid lines, axes and labels.
+export function canvasPalette() {
+  if (state.darkMode) {
+    return {
+      paper: '#151a1b', minor: '#ffffff12', unit: '#ffffff24', major: '#ffffff38', dot: '#ffffff40',
+      axis: '#e8ecec', label: '#9aa7ab', labelAxis: '#d7dedf', hole: '#151a1b',
+      guide: '#cfd8da', construction: '#e0a86e'
+    };
+  }
+  return {
+    paper: '#fffefa', minor: '#e8eded', unit: '#dbe4e3', major: '#d3dcdb', dot: '#d9e0df',
+    axis: '#536b73', label: '#718088', labelAxis: '#4b636a', hole: '#fffefa',
+    guide: '#41545a', construction: '#9d7957'
+  };
+}
+export function applyTheme() {
+  const dark = !!state.darkMode;
+  document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+  try { localStorage.setItem(THEME_KEY, dark ? 'dark' : 'light'); } catch (e) {}
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute('content', dark ? '#151a1b' : '#f6f2e9');
+  const btn = $('#theme-toggle');
+  if (btn) {
+    btn.textContent = dark ? '☀' : '☾';
+    btn.classList.toggle('active', dark);
+    btn.setAttribute('aria-pressed', String(dark));
+    btn.title = dark ? 'Switch to white paper (light mode)' : 'Switch to blackboard (dark mode)';
+  }
+}
+export function setDarkMode(on, opts = {}) {
+  const next = !!on;
+  if (state.darkMode === next && !opts.force) { applyTheme(); return; }
+  state.darkMode = next;
+  // Keep the active ink visible: charcoal <-> white chalk across themes.
+  const cur = String(state.color || '').toLowerCase();
+  if (next && cur === '#24353d') state.color = '#f2f0e9';
+  else if (!next && (cur === '#f2f0e9' || cur === '#f5f2e9' || cur === '#ffffff')) state.color = '#24353d';
+  if (!opts.silent) {
+    const swatches = typeof document !== 'undefined' ? [...document.querySelectorAll('.swatch')] : [];
+    swatches.forEach(s => s.classList.toggle('active', String(s.dataset.color || '').toLowerCase() === String(state.color).toLowerCase()));
+  }
+  applyTheme();
+  render();
+}
+export function initTheme() {
+  let saved = null;
+  try { saved = localStorage.getItem(THEME_KEY); } catch (e) {}
+  if (saved) state.darkMode = saved === 'dark';
+  else if (typeof window !== 'undefined' && window.matchMedia) state.darkMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  applyTheme();
+}
 
 export function loadState(data) {
   state.actions = data.actions || [];
@@ -21,12 +85,15 @@ export function loadState(data) {
   state.showGrid = data.showGrid !== false;
   state.showLabels = data.showLabels !== false;
   state.color = data.color || '#244bb3';
+  if (typeof data.darkMode === 'boolean') state.darkMode = data.darkMode;
   state.drawing = null;
   state.drag = null;
   state.divider = null;
   state.compassAnchor = null;
   state.compassCarryRadius = null;
   state.construction = null;
+  applyTheme();
+  try { [...document.querySelectorAll('.swatch')].forEach(s => s.classList.toggle('active', String(s.dataset.color || '').toLowerCase() === String(state.color).toLowerCase())); } catch (e) {}
 }
 
 export const toolCopy = {
@@ -159,7 +226,9 @@ export function showToast(message) { const t = $('#toast'); t.textContent = mess
 export function setToolTip(title, copy, keys = []) { const tips = keys.map(([key, label]) => `<kbd>${key}</kbd>${label ? ` ${label}` : ''}`).join('<span class="tip-sep">·</span>'); $('#tool-tip-card').innerHTML = `<b>${title}</b><span>${copy}</span>${keys.length ? `<span class="tip-keys">${tips}</span>` : ''}`; }
 export function canvasCursor() { return state.tool === 'hand' ? 'grab' : state.tool === 'eraser' ? 'cell' : state.tool === 'move' ? (state.drag ? 'grabbing' : 'move') : 'crosshair'; }
 export function pointOnMark(w) { let best = null, bestD = Infinity; state.actions.forEach(a => { let d = Infinity, p = null; if (a.type === 'line' || a.type === 'ruler' || a.type === 'set-square' || a.type === 'ray' || a.type === 'dotted') { d = segmentDistance(w, a.from, a.to); p = closestPointOnSegment(w, a.from, a.to); } else if (a.type === 'angle') { d = Math.min(pointDistance(w, a.center), segmentDistance(w, a.center, a.end)); p = pointDistance(w, a.center) <= segmentDistance(w, a.center, a.end) ? { x: a.center.x, y: a.center.y } : closestPointOnSegment(w, a.center, a.end); } else if (a.type === 'circle') { d = Math.abs(pointDistance(w, a.center) - a.radius); const r = a.radius, dist = pointDistance(w, a.center) || 1; p = { x: a.center.x + (w.x - a.center.x) * r / dist, y: a.center.y + (w.y - a.center.y) * r / dist }; } else if (ALL_SHAPES.includes(a.type)) { p = closestPointOnShape(w, a); d = p ? pointDistance(w, p) : Infinity; } if (p && d < bestD) { bestD = d; best = p; } }); return best && bestD < .3 ? best : null; }
-export function updateReadout(p) { const w = screenToWorld(p); let extra = ''; const a = state.drawing; if (a && (a.type === 'line' || a.type === 'ruler' || a.type === 'set-square')) { const len = pointDistance(a.from, a.to); extra = `&nbsp;&nbsp;from (${pretty(a.from.x)}, ${pretty(a.from.y)}) → (${pretty(a.to.x)}, ${pretty(a.to.y)}) · ${pretty(len)} u`; } else if (a && (a.type === 'ray' || a.type === 'dotted')) { const len = pointDistance(a.from, a.to); extra = `&nbsp;&nbsp;from (${pretty(a.from.x)}, ${pretty(a.from.y)}) to (${pretty(a.to.x)}, ${pretty(a.to.y)}) · ${pretty(len)} u`; } else if (a && ALL_SHAPES.includes(a.type)) { const bw = Math.abs(a.to.x - a.from.x), bh = Math.abs(a.to.y - a.from.y); extra = a.type === 'circle' ? `&nbsp;&nbsp;radius ${pretty(bw / 2)} u · diameter ${pretty(bw)} u` : a.type === 'ellipse' ? `&nbsp;&nbsp;rx ${pretty(bw / 2)} × ry ${pretty(bh / 2)}` : `&nbsp;&nbsp;width ${pretty(bw)} × height ${pretty(bh)}`; } else { let point = null; for (const act of state.actions) if (act.type === 'point' && pointDistance(act.at, w) < .55) { point = act; break; } if (point) { extra = `&nbsp;&nbsp;${point.label ? point.label + ' ' : ''}(${pretty(point.at.x)}, ${pretty(point.at.y)})`; } else { const m = pointOnMark(w); if (m) extra = `&nbsp;&nbsp;on line (${pretty(m.x)}, ${pretty(m.y)})`; } } $('#coordinate-readout').innerHTML = `x: ${pretty(w.x)}&nbsp;&nbsp; y: ${pretty(w.y)}${extra}`; }
+export function updateReadout(p) { const w = screenToWorld(p); let extra = ''; const a = state.drawing; if (a && (a.type === 'line' || a.type === 'ruler' || a.type === 'set-square')) { const len = pointDistance(a.from, a.to); extra = `&nbsp;&nbsp;from (${pretty(a.from.x)}, ${pretty(a.from.y)}) → (${pretty(a.to.x)}, ${pretty(a.to.y)}) · ${pretty(len)} u`; } else if (a && (a.type === 'ray' || a.type === 'dotted')) { const len = pointDistance(a.from, a.to); extra = `&nbsp;&nbsp;from (${pretty(a.from.x)}, ${pretty(a.from.y)}) to (${pretty(a.to.x)}, ${pretty(a.to.y)}) · ${pretty(len)} u`; } else if (a && ALL_SHAPES.includes(a.type)) { const bw = Math.abs(a.to.x - a.from.x), bh = Math.abs(a.to.y - a.from.y); extra = a.type === 'circle' ? `&nbsp;&nbsp;radius ${pretty(bw / 2)} u · diameter ${pretty(bw)} u` : a.type === 'ellipse' ? `&nbsp;&nbsp;rx ${pretty(bw / 2)} × ry ${pretty(bh / 2)}` : `&nbsp;&nbsp;width ${pretty(bw)} × height ${pretty(bh)}`; } else { let point = null; for (const act of state.actions) if (act.type === 'point' && pointDistance(act.at, w) < .55) { point = act; break; } if (point) { extra = `&nbsp;&nbsp;${point.label ? point.label + ' ' : ''}(${pretty(point.at.x)}, ${pretty(point.at.y)})`;     } else { const m = pointOnMark(w); if (m) extra = `&nbsp;&nbsp;on line (${pretty(m.x)}, ${pretty(m.y)})`; } }
+  if (state.snapStep && !['pencil', 'eraser', 'move', 'hand', 'label'].includes(state.tool)) { const sw = snap(w); if (pointDistance(sw, w) > .02) extra += `&nbsp;&nbsp;<span class="snap-hint">snaps to (${pretty(sw.x)}, ${pretty(sw.y)})</span>`; }
+  $('#coordinate-readout').innerHTML = `x: ${pretty(w.x)}&nbsp;&nbsp; y: ${pretty(w.y)}${extra}`; }
 export function setTool(tool) { state.tool = tool; $$('.tool').forEach(el => el.classList.toggle('active', el.dataset.tool === tool)); const sel = $('#shape-select'); if (sel) sel.value = SHAPES.includes(tool) ? tool : ''; const sel3 = $('#shape3d-select'); if (sel3) sel3.value = SHAPES3D.includes(tool) ? tool : ''; const [name, copy] = toolCopy[tool]; setToolTip(name, copy); canvas.style.cursor = canvasCursor(); render(); }
 
 let renderImpl = null;

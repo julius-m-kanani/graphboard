@@ -4,7 +4,7 @@ import './history.js';
 import './input.js';
 import { resizeCanvas } from './draw.js';
 import { updateHistory } from './history.js';
-import { state, loadState, render, $, showToast } from './core.js';
+import { state, loadState, render, $, showToast, initTheme } from './core.js';
 import { supabase, getProfile } from './supabase.js';
 import { showAuthView, attachAuthHandlers } from './auth.js';
 import { showDashboard, bindDashboardActions } from './dashboard.js';
@@ -14,6 +14,7 @@ import { recordVideo } from './recorder.js';
 window.__serializeState = () => serializeState(state);
 
 window.addEventListener('resize', resizeCanvas);
+initTheme();
 resizeCanvas();
 updateHistory();
 

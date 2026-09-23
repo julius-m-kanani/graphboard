@@ -49,6 +49,7 @@
     </script>
 
     <link rel="stylesheet" href="styles.css" />
+    <script>try{var t=localStorage.getItem('graphboard-theme');if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme: dark)').matches))document.documentElement.dataset.theme='dark';}catch(e){}</script>
   </head>
   <body>
     <main class="app-shell" id="workspace-view">
@@ -63,6 +64,7 @@
         </div>
         <div class="document-name"><span class="dot"></span><input id="doc-title" aria-label="Worksheet title" value="Cartesian plane" /></div>
         <div class="top-actions">
+          <button class="icon-button" id="theme-toggle" aria-label="Toggle blackboard mode" title="Switch to blackboard (dark mode)" aria-pressed="false">☾</button>
           <button class="icon-button" id="grid-toggle" aria-label="Toggle grid" title="Show or hide grid">▦</button>
           <button class="text-button" id="export-button">Export <span>⌄</span></button>
           <button class="text-button" id="classroom-button">Classroom</button>
@@ -171,6 +173,8 @@
               <button class="swatch" data-color="#d75448" style="--swatch:#d75448" aria-label="Red ink"></button>
               <button class="swatch" data-color="#24353d" style="--swatch:#24353d" aria-label="Charcoal ink"></button>
               <button class="swatch" data-color="#33866b" style="--swatch:#33866b" aria-label="Green ink"></button>
+              <button class="swatch chalk" data-color="#f2f0e9" style="--swatch:#f2f0e9" aria-label="White chalk"></button>
+              <button class="swatch chalk" data-color="#ffd166" style="--swatch:#ffd166" aria-label="Yellow chalk"></button>
             </div>
           </div>
         </aside>

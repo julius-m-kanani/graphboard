@@ -51,7 +51,10 @@ create table if not exists public.submissions (
   unique (exercise_id, student_id)
 );
 
--- The student's recorded session video, stored as a data URL (set on submit).
+-- The student's recorded session video. Stored in the "submission-videos"
+-- Storage bucket as '<student_id>/<submission_id>.webm'; this column holds the
+-- storage object path. Older rows hold legacy base64 data URLs (handled by the
+-- client). Storage RLS governs upload/download (see the storage section below).
 alter table public.submissions add column if not exists video text;
 
 -- Settings (key/value store, e.g. the teacher access code)
@@ -150,16 +153,28 @@ alter table public.settings enable row level security;
 create policy "own profile" on public.profiles
   for all using (auth.uid() = id) with check (auth.uid() = id);
 
+-- Security-definer helper so teachers can read the names of students in their
+-- classes without RLS recursion (class_members/classes policies reference
+-- profiles, so a plain policy on profiles would cycle).
+create or replace function public.teacher_can_read_student(p_student_id uuid)
+returns boolean
+language sql
+security definer set search_path = public
+stable
+as $$
+  select exists (
+    select 1 from public.class_members m
+    join public.classes c on c.id = m.class_id
+    where m.student_id = p_student_id
+      and c.teacher_id = auth.uid()
+  );
+$$;
+grant execute on function public.teacher_can_read_student(uuid) to authenticated;
+
 -- Teachers can see the names of the students enrolled in their classes, so the
 -- class roster and submission lists can show who submitted what.
 create policy "teachers read student profiles" on public.profiles
-  for select using (
-    exists (
-      select 1 from public.class_members m
-      join public.classes c on c.id = m.class_id
-      where m.student_id = public.profiles.id and c.teacher_id = auth.uid()
-    )
-  );
+  for select using (public.teacher_can_read_student(id));
 
 -- Classes: teacher owns, students can join by code
 create policy "teachers manage own classes" on public.classes
@@ -264,6 +279,46 @@ create policy "admin full access submissions" on public.submissions
 
 create policy "admin full access settings" on public.settings
   for all using (public.is_admin()) with check (public.is_admin());
+
+-- Storage -------------------------------------------------------------------
+-- Submission videos live in a private bucket; RLS on storage.objects governs
+-- who may upload/download them.
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('submission-videos', 'submission-videos', false, 52428800, array['video/webm', 'video/mp4'])
+on conflict (id) do nothing;
+
+create policy "owners upload own videos" on storage.objects
+  for insert to authenticated with check (
+    bucket_id = 'submission-videos'
+    and (storage.foldername(name))[1] = auth.uid()::text
+  );
+
+create policy "owners update own videos" on storage.objects
+  for update to authenticated using (
+    bucket_id = 'submission-videos'
+    and (storage.foldername(name))[1] = auth.uid()::text
+  );
+
+create policy "owners delete own videos" on storage.objects
+  for delete to authenticated using (
+    bucket_id = 'submission-videos'
+    and (storage.foldername(name))[1] = auth.uid()::text
+  );
+
+create policy "read class videos" on storage.objects
+  for select to authenticated using (
+    bucket_id = 'submission-videos'
+    and (
+      (storage.foldername(name))[1] = auth.uid()::text
+      or exists (
+        select 1 from public.submissions s
+        join public.exercises e on e.id = s.exercise_id
+        join public.classes c on c.id = e.class_id
+        where s.video = name and c.teacher_id = auth.uid()
+      )
+      or public.is_admin()
+    )
+  );
 
 -- Auto-create a profile on signup
 create or replace function public.handle_new_user()

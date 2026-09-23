@@ -20,6 +20,7 @@ export function serializeState(state) {
     showLabels: state.showLabels,
     snapStep: state.snapStep,
     paper: state.paper,
+    darkMode: !!state.darkMode,
     actions: state.actions.map(serializeAction)
   };
 }
@@ -42,6 +43,7 @@ export function deserializeState(data) {
     showLabels: d.showLabels !== false,
     snapStep: d.snapStep === undefined ? 0.5 : d.snapStep,
     paper: d.paper || 'square',
+    darkMode: !!d.darkMode,
     actions
   };
 }
